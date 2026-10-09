@@ -1,0 +1,271 @@
+{
+  "scenario": "lab",
+  "name": "实验室本周安排",
+  "week_start": "2026-10-12",
+  "activities": [
+    {
+      "id": "prepA",
+      "name": "样品预处理 A",
+      "duration": 2,
+      "category": "experiment",
+      "resources": [
+        "teamA",
+        "centrifuge"
+      ],
+      "demands": {},
+      "room_options": [
+        "lab1",
+        "lab2"
+      ],
+      "required_seats": 0,
+      "room_type": "general",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 18,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "prepB",
+      "name": "样品预处理 B",
+      "duration": 2,
+      "category": "experiment",
+      "resources": [
+        "teamB",
+        "centrifuge"
+      ],
+      "demands": {},
+      "room_options": [
+        "lab1",
+        "lab2"
+      ],
+      "required_seats": 0,
+      "room_type": "general",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 18,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "expA",
+      "name": "光谱分析 A",
+      "duration": 4,
+      "category": "experiment",
+      "resources": [
+        "teamA",
+        "spectrometer"
+      ],
+      "demands": {},
+      "room_options": [
+        "lab1",
+        "lab2"
+      ],
+      "required_seats": 0,
+      "room_type": "analysis",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 18,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "expB",
+      "name": "光谱分析 B",
+      "duration": 4,
+      "category": "experiment",
+      "resources": [
+        "teamB",
+        "spectrometer"
+      ],
+      "demands": {},
+      "room_options": [
+        "lab1",
+        "lab2"
+      ],
+      "required_seats": 0,
+      "room_type": "analysis",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 18,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "dataA",
+      "name": "数据整理 A",
+      "duration": 2,
+      "category": "study",
+      "resources": [
+        "teamA"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 18,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "dataB",
+      "name": "数据整理 B",
+      "duration": 2,
+      "category": "study",
+      "resources": [
+        "teamB"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 18,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    }
+  ],
+  "resources": [
+    {
+      "id": "teamA",
+      "name": "实验团队 A",
+      "type": "team",
+      "capacity": 1,
+      "seats": 0,
+      "room_type": ""
+    },
+    {
+      "id": "teamB",
+      "name": "实验团队 B",
+      "type": "team",
+      "capacity": 1,
+      "seats": 0,
+      "room_type": ""
+    },
+    {
+      "id": "spectrometer",
+      "name": "光谱仪 · 1 台",
+      "type": "equipment",
+      "capacity": 1,
+      "seats": 0,
+      "room_type": ""
+    },
+    {
+      "id": "centrifuge",
+      "name": "离心机 · 2 台",
+      "type": "equipment",
+      "capacity": 2,
+      "seats": 0,
+      "room_type": ""
+    },
+    {
+      "id": "lab1",
+      "name": "分析实验室",
+      "type": "room",
+      "capacity": 1,
+      "seats": 12,
+      "room_type": "analysis"
+    },
+    {
+      "id": "lab2",
+      "name": "基础实验室",
+      "type": "room",
+      "capacity": 1,
+      "seats": 20,
+      "room_type": "general"
+    }
+  ],
+  "constraints": [
+    {
+      "id": "preA",
+      "label": "先完成预处理 A，再进行光谱分析 A",
+      "type": "precedence",
+      "target": "prepA",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 48,
+      "other": "expA",
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "preB",
+      "label": "先完成预处理 B，再进行光谱分析 B",
+      "type": "precedence",
+      "target": "prepB",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 48,
+      "other": "expB",
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "postA",
+      "label": "光谱分析 A 完成后整理数据",
+      "type": "precedence",
+      "target": "expA",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 48,
+      "other": "dataA",
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "postB",
+      "label": "光谱分析 B 完成后整理数据",
+      "type": "precedence",
+      "target": "expB",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 48,
+      "other": "dataB",
+      "value": 0,
+      "source": "template"
+    }
+  ]
+}

@@ -1,0 +1,419 @@
+{
+  "scenario": "academic",
+  "name": "计算机 2401 班课表",
+  "week_start": "2026-10-12",
+  "activities": [
+    {
+      "id": "math0",
+      "name": "高等数学 1",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "class",
+        "li"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "lecture",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "math1",
+      "name": "高等数学 2",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "class",
+        "li"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "lecture",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "math2",
+      "name": "高等数学 3",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "class",
+        "li"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "lecture",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "ml0",
+      "name": "机器学习 1",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "class",
+        "zhang"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "lecture",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "ml1",
+      "name": "机器学习 2",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "class",
+        "zhang"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "lecture",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "eng0",
+      "name": "大学英语 1",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "class",
+        "wang"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "lecture",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "eng1",
+      "name": "大学英语 2",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "class",
+        "wang"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "lecture",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "db0",
+      "name": "数据库实验 1",
+      "duration": 4,
+      "category": "lab",
+      "resources": [
+        "class",
+        "zhang"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "computer",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "db1",
+      "name": "数据库实验 2",
+      "duration": 4,
+      "category": "lab",
+      "resources": [
+        "class",
+        "zhang"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "computer",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "linear0",
+      "name": "线性代数 1",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "class",
+        "li"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "lecture",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "linear1",
+      "name": "线性代数 2",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "class",
+        "li"
+      ],
+      "demands": {},
+      "room_options": [
+        "room1",
+        "room2"
+      ],
+      "required_seats": 36,
+      "room_type": "lecture",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4
+      ],
+      "window_start": 16,
+      "window_end": 36,
+      "optional": false,
+      "priority": 5
+    }
+  ],
+  "resources": [
+    {
+      "id": "class",
+      "name": "计算机 2401 班",
+      "type": "class",
+      "capacity": 1,
+      "seats": 0,
+      "room_type": ""
+    },
+    {
+      "id": "zhang",
+      "name": "张老师",
+      "type": "teacher",
+      "capacity": 1,
+      "seats": 0,
+      "room_type": ""
+    },
+    {
+      "id": "li",
+      "name": "李老师",
+      "type": "teacher",
+      "capacity": 1,
+      "seats": 0,
+      "room_type": ""
+    },
+    {
+      "id": "wang",
+      "name": "王老师",
+      "type": "teacher",
+      "capacity": 1,
+      "seats": 0,
+      "room_type": ""
+    },
+    {
+      "id": "room1",
+      "name": "教学楼 A201",
+      "type": "room",
+      "capacity": 1,
+      "seats": 50,
+      "room_type": "lecture"
+    },
+    {
+      "id": "room2",
+      "name": "计算机实验室",
+      "type": "room",
+      "capacity": 1,
+      "seats": 40,
+      "room_type": "computer"
+    }
+  ],
+  "constraints": [
+    {
+      "id": "zhangfriday",
+      "label": "张老师周五下午不可用",
+      "type": "unavailable",
+      "target": "zhang",
+      "level": "hard",
+      "day": 4,
+      "start": 24,
+      "end": 48,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "classlunch",
+      "label": "全班 12:00–14:00 午休",
+      "type": "unavailable",
+      "target": "class",
+      "level": "hard",
+      "day": null,
+      "start": 24,
+      "end": 28,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "classdaily",
+      "label": "每天最多安排 3 个教学活动",
+      "type": "daily_limit",
+      "target": "*",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 48,
+      "other": null,
+      "value": 3,
+      "source": "template"
+    },
+    {
+      "id": "morningpref",
+      "label": "课程尽量安排在上午",
+      "type": "preferred_window",
+      "target": "course",
+      "level": "soft",
+      "day": null,
+      "start": 16,
+      "end": 24,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    }
+  ]
+}

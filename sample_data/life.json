@@ -1,0 +1,916 @@
+{
+  "scenario": "life",
+  "name": "我的一周",
+  "week_start": "2026-10-12",
+  "activities": [
+    {
+      "id": "sleep0",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0
+      ],
+      "window_start": 0,
+      "window_end": 16,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "lunch0",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0
+      ],
+      "window_start": 23,
+      "window_end": 27,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "dinner0",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0
+      ],
+      "window_start": 35,
+      "window_end": 39,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "sleep1",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        1
+      ],
+      "window_start": 0,
+      "window_end": 16,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "lunch1",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        1
+      ],
+      "window_start": 23,
+      "window_end": 27,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "dinner1",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        1
+      ],
+      "window_start": 35,
+      "window_end": 39,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "sleep2",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        2
+      ],
+      "window_start": 0,
+      "window_end": 16,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "lunch2",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        2
+      ],
+      "window_start": 23,
+      "window_end": 27,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "dinner2",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        2
+      ],
+      "window_start": 35,
+      "window_end": 39,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "sleep3",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        3
+      ],
+      "window_start": 0,
+      "window_end": 16,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "lunch3",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        3
+      ],
+      "window_start": 23,
+      "window_end": 27,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "dinner3",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        3
+      ],
+      "window_start": 35,
+      "window_end": 39,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "sleep4",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        4
+      ],
+      "window_start": 0,
+      "window_end": 16,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "lunch4",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        4
+      ],
+      "window_start": 23,
+      "window_end": 27,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "dinner4",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        4
+      ],
+      "window_start": 35,
+      "window_end": 39,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "sleep5",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        5
+      ],
+      "window_start": 0,
+      "window_end": 16,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "lunch5",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        5
+      ],
+      "window_start": 23,
+      "window_end": 27,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "dinner5",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        5
+      ],
+      "window_start": 35,
+      "window_end": 39,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "sleep6",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        6
+      ],
+      "window_start": 0,
+      "window_end": 16,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "lunch6",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        6
+      ],
+      "window_start": 23,
+      "window_end": 27,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "dinner6",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        6
+      ],
+      "window_start": 35,
+      "window_end": 39,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "class0",
+      "name": "高等数学",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "class1",
+      "name": "大学英语",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        1
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "class2",
+      "name": "数据结构",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        2
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "class3",
+      "name": "计算机实验",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        3
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "class4",
+      "name": "线性代数",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        4
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "python0",
+      "name": "Python 学习 1",
+      "duration": 4,
+      "category": "study",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "run0",
+      "name": "跑步 1",
+      "duration": 2,
+      "category": "exercise",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "python1",
+      "name": "Python 学习 2",
+      "duration": 4,
+      "category": "study",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "run1",
+      "name": "跑步 2",
+      "duration": 2,
+      "category": "exercise",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "python2",
+      "name": "Python 学习 3",
+      "duration": 4,
+      "category": "study",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "run2",
+      "name": "跑步 3",
+      "duration": 2,
+      "category": "exercise",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "math0",
+      "name": "高数作业 1",
+      "duration": 3,
+      "category": "homework",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "math1",
+      "name": "高数作业 2",
+      "duration": 3,
+      "category": "homework",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": false,
+      "priority": 5
+    },
+    {
+      "id": "reading",
+      "name": "自由阅读",
+      "duration": 2,
+      "category": "leisure",
+      "resources": [
+        "me"
+      ],
+      "demands": {},
+      "room_options": [],
+      "required_seats": 0,
+      "room_type": "",
+      "days": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "window_start": 16,
+      "window_end": 44,
+      "optional": true,
+      "priority": 2
+    }
+  ],
+  "resources": [
+    {
+      "id": "me",
+      "name": "我的时间",
+      "type": "person",
+      "capacity": 1,
+      "seats": 0,
+      "room_type": ""
+    }
+  ],
+  "constraints": [
+    {
+      "id": "fixed0",
+      "label": "高等数学 · 周一 09:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class0",
+      "level": "hard",
+      "day": 0,
+      "start": 18,
+      "end": 48,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "fixed1",
+      "label": "大学英语 · 周二 10:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class1",
+      "level": "hard",
+      "day": 1,
+      "start": 20,
+      "end": 48,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "fixed2",
+      "label": "数据结构 · 周三 09:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class2",
+      "level": "hard",
+      "day": 2,
+      "start": 18,
+      "end": 48,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "fixed3",
+      "label": "计算机实验 · 周四 14:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class3",
+      "level": "hard",
+      "day": 3,
+      "start": 28,
+      "end": 48,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "fixed4",
+      "label": "线性代数 · 周五 09:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class4",
+      "level": "hard",
+      "day": 4,
+      "start": 18,
+      "end": 48,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "deadline0",
+      "label": "高数作业 · 周三开始前完成",
+      "type": "deadline",
+      "target": "math0",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 96,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "deadline1",
+      "label": "高数作业 · 周三开始前完成",
+      "type": "deadline",
+      "target": "math1",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 96,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "runpref",
+      "label": "跑步尽量安排在 17:00 以后",
+      "type": "preferred_window",
+      "target": "exercise",
+      "level": "soft",
+      "day": null,
+      "start": 34,
+      "end": 44,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "rundaily",
+      "label": "跑步分 3 天进行，每天最多 1 次",
+      "type": "daily_limit",
+      "target": "exercise",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 48,
+      "other": null,
+      "value": 1,
+      "source": "template"
+    },
+    {
+      "id": "studywindow",
+      "label": "学习安排在 08:00–22:00",
+      "type": "time_window",
+      "target": "study",
+      "level": "hard",
+      "day": null,
+      "start": 16,
+      "end": 44,
+      "other": null,
+      "value": 0,
+      "source": "template"
+    },
+    {
+      "id": "studydaily",
+      "label": "Python 学习分 3 天进行",
+      "type": "daily_limit",
+      "target": "study",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 48,
+      "other": null,
+      "value": 1,
+      "source": "template"
+    }
+  ]
+}

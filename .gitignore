@@ -1,0 +1,11 @@
+.env
+.venv/
+node_modules/
+# The small demo commits its verified frontend build for Python-only deployment.
+__pycache__/
+.pytest_cache/
+*.db
+*.log
+logs/
+.demo.pid
+*.tsbuildinfo

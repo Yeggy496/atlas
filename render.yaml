@@ -1,0 +1,17 @@
+# Deployment template only; no cloud service has been created.
+# Commit frontend/dist together with source before deploying this small demo.
+services:
+  - type: web
+    name: atlas
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements-lock.txt && python run_demo.py --check
+    startCommand: uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.14
+      - key: LLM_PROVIDER
+        value: demo
+      - key: ATLAS_DB_PATH
+        value: /tmp/atlas.db

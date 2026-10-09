@@ -1,0 +1,173 @@
+.workspace-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 18px;
+  font-size: 9px;
+  color: #a8b3c6;
+  padding-bottom: 6px;
+}
+.workspace-footer > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.workspace-footer button {
+  font-size: 10px;
+  color: #879bbf;
+}
+.workspace-footer button:hover:not(:disabled) {
+  color: #365bd6;
+}
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 6px;
+  border-bottom: 1px solid #eef1f6;
+}
+.activity-row > div {
+  flex: 1;
+}
+.activity-row strong {
+  font-size: 11px;
+  font-weight: 500;
+  color: #7686a0;
+  display: block;
+}
+.activity-row small {
+  display: block;
+  font-size: 9px;
+  margin-top: 4px;
+  color: #a7b1c4;
+}
+.parse-summary {
+  margin: 0 16px 14px;
+  background: #f4f8ff;
+  border: 1px solid #e1e9fb;
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 10px;
+  color: #7d92b9;
+}
+.parse-summary summary {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  font-weight: 600;
+}
+.parse-summary p {
+  margin-top: 7px;
+  line-height: 1.6;
+  font-size: 10px;
+}
+.parse-warning {
+  margin: 0 16px 14px;
+  background: #fffbf1;
+  border: 1px solid #f3e6c9;
+  padding: 9px;
+  border-radius: 6px;
+  color: #af9460;
+  font-size: 10px;
+  line-height: 1.7;
+}
+.parse-warning p + p {
+  margin-top: 6px;
+}
+.muted {
+  color: #a0aec4;
+  font-size: 11px;
+}
+.resource-view {
+  padding: 23px;
+}
+.resource-view h3 {
+  font-size: 13px;
+  font-weight: 550;
+  color: #6d80a2;
+  margin-bottom: 9px;
+}
+.resource-view > p {
+  line-height: 1.8;
+}
+.resource-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 19px 0;
+  border-bottom: 1px solid #edf0f7;
+}
+.resource-row > div:first-child {
+  width: 150px;
+  flex-shrink: 0;
+}
+.resource-row strong {
+  font-size: 12px;
+  font-weight: 500;
+  color: #7186aa;
+}
+.resource-row small {
+  font-size: 9px;
+  color: #a4b1c9;
+}
+.resource-row > div > small {
+  display: block;
+  margin-top: 5px;
+}
+.resource-bar {
+  flex: 1;
+  height: 7px;
+  background: #f1f4fa;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.resource-bar > span {
+  display: block;
+  height: 100%;
+  background: #86a2ed;
+  border-radius: 10px;
+  min-width: 2px;
+}
+.resource-view h3.daily-title {
+  margin-top: 26px;
+}
+.bar-chart {
+  display: flex;
+  align-items: end;
+  gap: 20px;
+  padding: 24px 12px 15px;
+  justify-content: space-around;
+}
+.bar-chart > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+.bar-chart span {
+  font-size: 10px;
+  color: #8297bc;
+}
+.bar-chart > div > div {
+  height: 120px;
+  display: flex;
+  align-items: end;
+  width: 100%;
+  max-width: 38px;
+}
+.bar-chart i {
+  width: 100%;
+  background: #dce7fd;
+  border: 1px solid #c8d8fa;
+  border-radius: 5px 5px 0 0;
+}
+.bar-chart small {
+  font-size: 10px;
+  color: #98a9c4;
+}
+.resource-view > p:last-child {
+  margin-top: 16px;
+  font-size: 10px;
+}
