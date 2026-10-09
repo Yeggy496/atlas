@@ -1,4 +1,5 @@
 from collections import defaultdict
+import os
 from ortools.sat.python import cp_model
 from ..schemas import Problem, Assignment
 from .constraints import candidates, applies, preference_cost
@@ -11,7 +12,9 @@ WEIGHTS = {
 }
 
 
-def solve(problem: Problem, mode='balanced', previous=None, seconds=4.0, optimize=True):
+def solve(problem: Problem, mode='balanced', previous=None, seconds=None, optimize=True):
+    if seconds is None:
+        seconds = float(os.getenv('ATLAS_SOLVE_SECONDS', '4'))
     model = cp_model.CpModel()
     occupancy, choices, presences, starts = defaultdict(list), {}, {}, {}
     day_loads, day_choices = defaultdict(list), defaultdict(list)
@@ -100,7 +103,7 @@ def solve(problem: Problem, mode='balanced', previous=None, seconds=4.0, optimiz
         model.minimize(sum(WEIGHTS[mode][k]*sum(v) for k,v in terms.items()))
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = seconds
-    solver.parameters.num_search_workers = 4
+    solver.parameters.num_search_workers = int(os.getenv('ATLAS_SOLVER_WORKERS', '4'))
     solver.parameters.random_seed = 42
     status = solver.solve(model)
     name = solver.status_name(status)

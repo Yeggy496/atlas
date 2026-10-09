@@ -1,4 +1,5 @@
 """Repair suggestions are accepted only after a real solver verifies the change."""
+import os
 from ..schemas import Problem, Constraint
 from .engine import solve
 from .constraints import candidates
@@ -13,7 +14,7 @@ def diagnose(problem: Problem):
     for c in [c for c in problem.constraints if c.level=='hard'][:20]:
         changed = problem.model_copy(deep=True)
         changed.constraints = [x for x in changed.constraints if x.id != c.id]
-        witness = solve(changed,seconds=.45,optimize=False)
+        witness = solve(changed,seconds=float(os.getenv('ATLAS_DIAGNOSIS_SECONDS', '.45')),optimize=False)
         if witness['status'] in ('FEASIBLE','OPTIMAL'):
             repairs.append({'constraint_id':c.id,'label':f'放宽「{c.label}」','detail':'已重新求解验证：移除此条限制后存在合法方案。需你确认后应用。','verified':True})
             if len(repairs)>=3:

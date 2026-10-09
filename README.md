@@ -1,5 +1,7 @@
 # ATLAS-Σ
 
+Live demo: https://atlas-ptbu.onrender.com
+
 A small scheduling demo for personal weekly planning, one-class academic timetabling, and laboratory resources.
 All three scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
@@ -22,7 +24,7 @@ After editing frontend code, run `pnpm build` and commit the updated build.
 
 `render.yaml` defines one free native Python web service. The service uses the platform-provided HTTPS domain.
 Build: `pip install -r backend/requirements-lock.txt && python run_demo.py --check`
-Start: `uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT`
+Start: `ATLAS_SOLVE_SECONDS=30 ATLAS_SOLVER_WORKERS=1 ATLAS_DIAGNOSIS_SECONDS=2 uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT`
 Health check: `/api/health`.
 
 ## Features and boundaries
