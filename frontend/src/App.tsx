@@ -524,7 +524,7 @@ export default function App() {
               <span />
               CP-SAT 引擎
             </span>
-            <span className="demo-badge">DEMO</span>
+            <span className="demo-badge">{provider === "demo" ? "DEMO" : provider.toUpperCase()}</span>
             <button
               className="icon-button"
               aria-label="使用指南"

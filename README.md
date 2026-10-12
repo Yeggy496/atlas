@@ -9,6 +9,8 @@ All five scenarios share a validated constraint model and a real OR-Tools CP-SAT
 Current small update: [v0.1.5 notes and DeepSeek setup](docs/RELEASE_0.1.5.md).
 Verified capability report before this update: [2026-10-12 review](docs/REVIEW_2026-10-12.md).
 The default provider remains `demo`; real model calls require server-side configuration.
+The existing Render website was configured with the official DeepSeek provider and verified on
+2026-10-12; local clones still need their own server-side key and settings.
 The report distinguishes working website features from backend-only capabilities and remaining limitations.
 
 ## Run
@@ -74,7 +76,8 @@ The real providers call an OpenAI-compatible `/chat/completions` endpoint and re
 
 ### Turning on a real provider on Render
 
-The hosted demo ships with `LLM_PROVIDER=demo` so the public site always works without secrets. To enable a real model:
+The deployment template defaults to `LLM_PROVIDER=demo` so a new deployment works without secrets.
+The existing hosted website now uses the official DeepSeek endpoint. To enable a real model on another deployment:
 
 1. Set `LLM_PROVIDER` to `openai` or `deepseek` in the Render dashboard (or `render.yaml`).
 2. Add the matching `*_API_KEY` as a secret environment variable. Never commit it.
