@@ -921,7 +921,7 @@ export default function App() {
             <ol>
               <li>
                 <strong>选择一个场景</strong>
-                <p>选择需要安排的场景，从预置方案开始，或导入自己的任务与资源。</p>
+                <p>选择需要安排的场景，从预置方案开始，或导入自己的任务。</p>
               </li>
               <li>
                 <strong>描述安排或导入文件</strong>
