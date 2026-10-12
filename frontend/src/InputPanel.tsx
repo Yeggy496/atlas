@@ -29,6 +29,7 @@ import {
   CATEGORIES,
 } from "./types";
 import { WeightPanel } from "./WeightPanel";
+import { MAX_INPUT_CHARS } from "./types";
 interface Props {
   problem: Problem | null;
   busy: string;
@@ -101,6 +102,7 @@ export function InputPanel({
   textFileRef,
   importText,
 }: Props) {
+  const inputTooLong = input.length > MAX_INPUT_CHARS;
   const activityGroups = new Map<string, Activity[]>();
   for (const a of problem?.activities ?? []) {
     if (a.group) {
@@ -122,12 +124,13 @@ export function InputPanel({
           <p>需求从这里开始</p>
         </div>
         <span className="ai-tag">
-          {provider === "demo" ? "离线演示" : "LLM"}
+          {provider === "demo" ? "离线演示" : provider === "deepseek" ? "DeepSeek" : "OpenAI"}
         </span>
       </div>
       <div className="nl-input">
         <textarea
           aria-label="自然语言需求"
+          aria-describedby="input-length-hint"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="例如：周三19:00有一个临时会议。"
@@ -140,7 +143,7 @@ export function InputPanel({
           </span>
           <button
             className="parse-button"
-            disabled={!!busy || !input.trim() || !problem}
+            disabled={!!busy || !input.trim() || !problem || inputTooLong}
             onClick={parse}
           >
             {busy === "正在识别约束" ? (
@@ -152,6 +155,9 @@ export function InputPanel({
           </button>
         </div>
       </div>
+      <p id="input-length-hint" className={`input-length-hint ${inputTooLong ? "too-long" : ""}`}>
+        {inputTooLong ? "文本较长，请分段识别，或精简到 4,000 字以内。" : `${input.length.toLocaleString()} / 4,000 字`}
+      </p>
       <div className="import-row">
         <button disabled={!!busy} onClick={() => fileRef.current?.click()}>
           <Upload size={14} />
@@ -376,6 +382,7 @@ export function InputPanel({
               ? "兼顾目标、时间紧凑与每日负载。"
               : "优先保留已有安排，并提前完成截止任务。"}
           <span className="mode-hint">切换档位会立即按新偏好重新求解</span>
+          {mode !== "robust" && <span className="mode-hint">需要尽量保留原安排时，可选择稳健模式。</span>}
         </p>
         <WeightPanel
           meta={weightsMeta}

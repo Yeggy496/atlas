@@ -88,6 +88,16 @@
 .parse-button:hover:not(:disabled) {
   background: #eef3ff;
 }
+.input-length-hint {
+  margin: 5px 18px 0;
+  font-size: 9px;
+  color: #8d99ae;
+  text-align: right;
+}
+.input-length-hint.too-long {
+  color: #bc725b;
+  text-align: left;
+}
 .import-row {
   display: flex;
   align-items: center;

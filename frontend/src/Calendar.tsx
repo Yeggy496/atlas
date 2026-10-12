@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Moon, CalendarDays, ArrowUpRight } from "lucide-react";
+import { calendarLanes } from "./calendarLayout";
 import {
   type Problem,
   type Result,
@@ -27,6 +28,10 @@ export function Calendar({
     (_, i) => startHour + i,
   );
   const assignments = result?.assignments ?? [];
+  const dayEvents = DAYS.map((_, day) => assignments.filter(
+    (x) => x.start < day * 48 + endHour * 2 && x.end > day * 48 + startHour * 2,
+  ));
+  const lanes = dayEvents.map(calendarLanes);
   const sleep = assignments.filter(
     (x) =>
       problem.activities.find((a) => a.id === x.activity_id)?.category ===
@@ -113,54 +118,37 @@ export function Calendar({
                   key={day}
                   style={{ backgroundSize: `100% ${rowHeight}px` }}
                 >
-                  {assignments
-                    .filter(
-                      (x) =>
-                        x.start >= dayIndex * 48 + startHour * 2 &&
-                        x.start < dayIndex * 48 + endHour * 2,
-                    )
+                  {dayEvents[dayIndex]
                     .map((x) => {
                       const a = problem.activities.find(
                         (a) => a.id === x.activity_id,
                       )!;
                       const category =
                         CATEGORIES[a.category] ?? CATEGORIES.study;
-                      const concurrent = assignments.filter(
-                        (y) =>
-                          y.activity_id !== x.activity_id &&
-                          y.start < x.end &&
-                          y.end > x.start &&
-                          Math.floor(y.start / 48) === dayIndex,
-                      );
-                      const overlaps =
-                        concurrent.length > 0 && problem.scenario === "lab";
-                      const lane = overlaps
-                        ? a.resources.includes("teamB")
-                          ? 1
-                          : 0
-                        : 0;
+                      const { lane, lanes: count } = lanes[dayIndex].get(x.activity_id)!;
+                      const visibleStart = Math.max(x.start - dayIndex * 48, startHour * 2);
+                      const visibleEnd = Math.min(x.end - dayIndex * 48, endHour * 2);
                       return (
                         <button
                           aria-label={`${day} ${clock(x.start)} ${a.name}`}
-                          title={`${a.name} ${clock(x.start)}–${clock(x.end)}`}
+                          title={`${a.name} ${clock(x.start)}–${x.end % 48 === 0 ? "24:00" : clock(x.end)}`}
                           onClick={() => onSelect(x)}
                           className={`calendar-event ${category.color} ${x.end - x.start <= 1 ? "short" : ""}`}
                           key={x.activity_id}
                           style={{
                             top:
-                              (((x.start % 48) - startHour * 2) * rowHeight) /
+                              ((visibleStart - startHour * 2) * rowHeight) /
                                 2 +
                               2,
                             height: Math.max(
                               18,
-                              ((Math.min(x.end % 48 || 48, endHour * 2) -
-                                (x.start % 48)) *
+                              ((visibleEnd - visibleStart) *
                                 rowHeight) /
                                 2 -
                                 4,
                             ),
-                            left: overlaps ? `${lane * 50 + 3}%` : 4,
-                            right: overlaps ? `${(1 - lane) * 50 + 3}%` : 4,
+                            left: `calc(${lane * 100 / count}% + 4px)`,
+                            right: `calc(${(count - lane - 1) * 100 / count}% + 4px)`,
                           }}
                         >
                           <strong>{a.name}</strong>

@@ -16,8 +16,15 @@ services:
       - key: ATLAS_DB_PATH
         value: /tmp/atlas.db
 
-      # Optional real-model settings. Keep LLM_PROVIDER=demo for the public demo,
-      # then uncomment and fill these in the Render dashboard (never commit a key):
+      # Keep demo until a key is saved. To enable DeepSeek, set LLM_PROVIDER=deepseek
+      # and these values in the existing service's dashboard (never commit a key):
+      # - key: DEEPSEEK_API_KEY
+      #   sync: false
+      # - key: DEEPSEEK_MODEL
+      #   value: deepseek-flash
+      # - key: DEEPSEEK_TIMEOUT
+      #   value: "90"
+      # OpenAI remains an alternative provider:
       # - key: OPENAI_API_KEY
       #   sync: false
       # - key: OPENAI_MODEL

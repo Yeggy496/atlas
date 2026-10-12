@@ -6,7 +6,8 @@ A small scheduling application for personal weekly planning, one-class academic 
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Latest verified capability report: [2026-10-12 review](docs/REVIEW_2026-10-12.md).
+Current small update: [v0.1.5 notes and DeepSeek setup](docs/RELEASE_0.1.5.md).
+Verified capability report before this update: [2026-10-12 review](docs/REVIEW_2026-10-12.md).
 The default provider remains `demo`; real model calls require server-side configuration.
 The report distinguishes working website features from backend-only capabilities and remaining limitations.
 
@@ -64,9 +65,9 @@ The real providers call an OpenAI-compatible `/chat/completions` endpoint and re
 | --- | --- |
 | `LLM_PROVIDER` | `demo` (default), `openai`, or `deepseek` |
 | `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` | provider credential (never commit) |
-| `OPENAI_MODEL` / `DEEPSEEK_MODEL` | model name (defaults `gpt-4.1-mini` / `deepseek-chat`) |
+| `OPENAI_MODEL` / `DEEPSEEK_MODEL` | model name (defaults `gpt-4.1-mini` / `deepseek-flash`) |
 | `OPENAI_BASE_URL` / `DEEPSEEK_BASE_URL` | optional OpenAI-compatible gateway override (blank = official endpoint) |
-| `OPENAI_TIMEOUT` / `DEEPSEEK_TIMEOUT` | per-request seconds (default `35`; raise for slow gateways) |
+| `OPENAI_TIMEOUT` / `DEEPSEEK_TIMEOUT` | per-request seconds (defaults `35` / `90`) |
 
 `backend/tests/test_llm_live.py` performs a real end-to-end provider call. It is skipped unless
 `ATLAS_LLM_LIVE_TEST=1` and a key are set, so the offline suite and CI stay green without credentials.
@@ -78,8 +79,9 @@ The hosted demo ships with `LLM_PROVIDER=demo` so the public site always works w
 1. Set `LLM_PROVIDER` to `openai` or `deepseek` in the Render dashboard (or `render.yaml`).
 2. Add the matching `*_API_KEY` as a secret environment variable. Never commit it.
 3. Optionally point `*_BASE_URL` at an OpenAI-compatible gateway and raise `*_TIMEOUT`.
-   For the official DeepSeek endpoint the verified values are `LLM_PROVIDER=deepseek`,
-   `DEEPSEEK_MODEL=deepseek-chat`, and `DEEPSEEK_TIMEOUT=60`.
+   For the current official DeepSeek endpoint use `LLM_PROVIDER=deepseek`,
+   `DEEPSEEK_MODEL=deepseek-flash`, and `DEEPSEEK_TIMEOUT=90`.
+   The backend disables thinking for these JSON extraction calls.
 4. Prove the server can reach the model before showing the demo:
 
    `python scripts/check_llm.py --scenario academic`

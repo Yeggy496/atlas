@@ -49,6 +49,11 @@ def test_valid_model_output_still_requires_user_review(monkeypatch, provider):
     assert result['requires_review'] is True
     assert result['provider'] == provider
     assert post.call_args.kwargs['json']['response_format'] == {'type': 'json_object'}
+    payload = post.call_args.kwargs['json']
+    if provider == 'deepseek':
+        assert payload['thinking'] == {'type': 'disabled'}
+    else:
+        assert 'thinking' not in payload
 
 
 @pytest.mark.parametrize('failure', ['timeout', 'unauthorized'])

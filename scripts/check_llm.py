@@ -29,7 +29,7 @@ REQUESTS = {
     'academic': '周三下午不要排课。',
     'lab': '周四下午两点到四点设备占用。',
 }
-DEFAULT_MODEL = {'openai': 'gpt-4.1-mini', 'deepseek': 'deepseek-chat'}
+DEFAULT_MODEL = {'openai': 'gpt-4.1-mini', 'deepseek': 'deepseek-flash'}
 DEFAULT_BASE = {'openai': 'https://api.openai.com/v1', 'deepseek': 'https://api.deepseek.com'}
 
 
@@ -51,7 +51,7 @@ def main() -> int:
     key = os.getenv(f'{prefix}_API_KEY', '')
     base = os.getenv(f'{prefix}_BASE_URL') or DEFAULT_BASE[provider_name]
     model = os.getenv(f'{prefix}_MODEL') or DEFAULT_MODEL[provider_name]
-    timeout = os.getenv(f'{prefix}_TIMEOUT', '35')
+    timeout = os.getenv(f'{prefix}_TIMEOUT', '90' if provider_name == 'deepseek' else '35')
 
     print(f'provider = {provider_name}')
     print(f'model    = {model}')

@@ -146,6 +146,7 @@ export interface HistoryRun {
   problem: Problem;
   result: Result;
 }
+export const MAX_INPUT_CHARS = 4000;
 export const DAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 export const SCENARIOS: Record<
   Scenario,

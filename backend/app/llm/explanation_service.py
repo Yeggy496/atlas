@@ -18,6 +18,7 @@ import os
 import httpx
 
 from ..solver.explain import explain
+from .providers import request_options
 
 
 MAX_HEADLINE = 240
@@ -51,11 +52,11 @@ class LLMExplanation:
             return None
         default_base = 'https://api.openai.com/v1' if self.provider == 'openai' else 'https://api.deepseek.com'
         base = (os.getenv(f'{prefix}_BASE_URL') or default_base).rstrip('/')
-        model = os.getenv(f'{prefix}_MODEL', 'gpt-4.1-mini' if self.provider == 'openai' else 'deepseek-chat')
+        model = os.getenv(f'{prefix}_MODEL', 'gpt-4.1-mini' if self.provider == 'openai' else 'deepseek-flash')
         timeout = float(os.getenv(f'{prefix}_TIMEOUT', '35'))
         prompt = ('你是调度结果解释助手。下面给出某个活动被安排在此时刻的真实求解事实（JSON）。'
                   '请只依据这些事实，用 1-2 句中文口语化地解释“为什么排在这个时间”。'
-                  '不得引入事实之外的任何信息，不得声称唯一性或最优性，除非事实里写明候选时段只有 1 个。'
+                  '不得引入事实之外的任何信息，不得声称唯一性或最优性；候选时段数量只经过单活动时间筛选，不代表整体可行方案数量。'
                   '只返回 JSON 对象 {"headline": "...", "bullets": ["..."]}，不要解释、不要代码。')
         payload = {'activity': facts.get('name'), 'day': facts.get('day_name'),
                    'clock': f"{facts.get('start_clock')}-{facts.get('end_clock')}",
@@ -69,7 +70,8 @@ class LLMExplanation:
                                    json={'model': model, 'temperature': 0,
                                          'response_format': {'type': 'json_object'},
                                          'messages': [{'role': 'system', 'content': prompt},
-                                                      {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}]})
+                                                      {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}],
+                                         **request_options(self.provider)})
             response.raise_for_status()
             content = response.json()['choices'][0]['message']['content']
         if not isinstance(content, str):

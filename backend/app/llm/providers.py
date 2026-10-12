@@ -20,6 +20,11 @@ class ParsedConstraints(BaseModel):
     warnings: list[StrictStr] = Field(default_factory=list)
 
 
+def request_options(provider: str) -> dict:
+    # Constraint extraction needs JSON, not a lengthy reasoning response.
+    return {'thinking': {'type': 'disabled'}} if provider == 'deepseek' else {}
+
+
 class APIProvider:
     def __init__(self, provider: str):
         self.provider = provider
@@ -31,15 +36,15 @@ class APIProvider:
             raise ValueError(f'尚未配置 {prefix}_API_KEY。可切换离线演示解析或手工编辑约束。')
         default_base = 'https://api.openai.com/v1' if self.provider=='openai' else 'https://api.deepseek.com'
         base = (os.getenv(f'{prefix}_BASE_URL') or default_base).rstrip('/')
-        model = os.getenv(f'{prefix}_MODEL','gpt-4.1-mini' if self.provider=='openai' else 'deepseek-chat')
-        timeout = float(os.getenv(f'{prefix}_TIMEOUT', '35'))
+        model = os.getenv(f'{prefix}_MODEL','gpt-4.1-mini' if self.provider=='openai' else 'deepseek-flash')
+        timeout = float(os.getenv(f'{prefix}_TIMEOUT', '90' if self.provider == 'deepseek' else '35'))
         prompt = ('你是约束解析器，不安排日程。只返回 JSON 对象，包含 problem（完整修改后的问题）、summary（变更说明字符串数组）、warnings（歧义或不支持项字符串数组）。'
                   '每个 slot=30分钟，周一=0，start/end是当天slot；deadline.end是从周一00:00开始的slot。必须保留未修改的输入。'
                   '不能凭空创造课程、设备或人员，未知实体和歧义写入warnings。只使用给定Schema支持的类型。preferred_window必须soft，其余hard。'
                   '重复活动展开为独立实例；学习可拆分为多项；不得输出调度结果、代码或表达式。Schema:\n'+json.dumps(Problem.model_json_schema(),ensure_ascii=False))
         try:
             with httpx.Client(timeout=timeout) as client:
-                response=client.post(base+'/chat/completions',headers={'Authorization':f'Bearer {key}'},json={'model':model,'temperature':0,'response_format':{'type':'json_object'},'messages':[{'role':'system','content':prompt},{'role':'user','content':json.dumps({'current_problem':problem.model_dump(),'request':text},ensure_ascii=False)}]})
+                response=client.post(base+'/chat/completions',headers={'Authorization':f'Bearer {key}'},json={'model':model,'temperature':0,'response_format':{'type':'json_object'},'messages':[{'role':'system','content':prompt},{'role':'user','content':json.dumps({'current_problem':problem.model_dump(),'request':text},ensure_ascii=False)}],**request_options(self.provider)})
                 response.raise_for_status()
                 content=response.json()['choices'][0]['message']['content']
                 if not isinstance(content,str):
@@ -64,8 +69,8 @@ class APIProvider:
             raise ValueError(f'尚未配置 {prefix}_API_KEY，无法运行 Direct-LLM 基线。')
         default_base = 'https://api.openai.com/v1' if self.provider == 'openai' else 'https://api.deepseek.com'
         base = (os.getenv(f'{prefix}_BASE_URL') or default_base).rstrip('/')
-        model = os.getenv(f'{prefix}_MODEL', 'gpt-4.1-mini' if self.provider == 'openai' else 'deepseek-chat')
-        timeout = float(os.getenv(f'{prefix}_TIMEOUT', '35'))
+        model = os.getenv(f'{prefix}_MODEL', 'gpt-4.1-mini' if self.provider == 'openai' else 'deepseek-flash')
+        timeout = float(os.getenv(f'{prefix}_TIMEOUT', '90' if self.provider == 'deepseek' else '35'))
         payload = {'activities': [a.model_dump() for a in problem.activities],
                    'resources': [r.model_dump() for r in problem.resources],
                    'constraints': [c.model_dump() for c in problem.constraints]}
@@ -78,7 +83,8 @@ class APIProvider:
                                        json={'model': model, 'temperature': 0,
                                              'response_format': {'type': 'json_object'},
                                              'messages': [{'role': 'system', 'content': prompt},
-                                                          {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}]})
+                                                          {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}],
+                                             **request_options(self.provider)})
                 response.raise_for_status()
                 content = response.json()['choices'][0]['message']['content']
                 if not isinstance(content, str):

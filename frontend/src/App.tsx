@@ -59,6 +59,7 @@ import {
   DAYS,
   SCENARIOS,
   clock,
+  MAX_INPUT_CHARS,
 } from "./types";
 
 const SCENARIO_ICONS: Record<Scenario, typeof CalendarDays> = {
@@ -85,6 +86,7 @@ export default function App() {
     [notice, setNotice] = useState("");
   const [input, setInput] = useState(SCENARIOS.life.input),
     [provider, setProvider] = useState("demo");
+  const [version, setVersion] = useState("");
   const [reviewed, setReviewed] = useState(true),
     [summary, setSummary] = useState<string[]>([]),
     [warnings, setWarnings] = useState<string[]>([]);
@@ -143,8 +145,8 @@ export default function App() {
     }
   }
   useEffect(() => {
-    api<{ provider: string }>("/health")
-      .then((x) => setProvider(x.provider))
+    api<{ provider: string; version: string }>("/health")
+      .then((x) => { setProvider(x.provider); setVersion(x.version); })
       .catch(() => setError("暂时无法连接后端，请确认服务已启动。"));
     // Weight dimensions come from the solver so the UI never hard-codes them.
     api<WeightsMeta>("/weights")
@@ -236,6 +238,10 @@ export default function App() {
   }
   async function parse() {
     if (!problem) return;
+    if (input.length > MAX_INPUT_CHARS) {
+      setError("每次最多识别 4,000 字，请分段输入或精简文本。");
+      return;
+    }
     setBusy("正在识别约束");
     setError("");
     try {
@@ -500,7 +506,7 @@ export default function App() {
           <div className="profile">
             <span>我</span>
             <div>
-              个人工作空间<small>ATLAS-Σ v0.1</small>
+              个人工作空间<small>ATLAS-Σ{version ? ` v${version}` : ""}</small>
             </div>
           </div>
         </div>

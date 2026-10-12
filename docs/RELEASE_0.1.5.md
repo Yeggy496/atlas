@@ -1,0 +1,39 @@
+# v0.1.5 · 小幅体验调整
+
+日期：2026-10-12。保留五个场景、页面结构及统一 CP-SAT 核心。
+
+- 日历对所有场景的并发活动自动分列，避免会议或工序互相遮挡；白天视图显示跨过 08:00 边界的活动片段。
+- 输入框显示字数，长 TXT/PDF 提取内容超过 4,000 字时提示分段，阻止直接提交导致解析错误；不静默删掉用户需求。
+- 明确提示需要保留旧安排时使用稳健模式；版本信息来自后端，模型标签区分 DeepSeek 与离线演示。
+- DeepSeek 默认模型更新为 `deepseek-flash`，JSON 提取使用非思考模式；结果解释不将单活动候选数量当作全局唯一性证明。
+- 重新构建前端，并同步 Python 部署使用的两份构建产物。
+
+## DeepSeek 配置
+
+本次按用户要求先上线网站，继续使用 `LLM_PROVIDER=demo`；尚未配置密钥，没有启用或实测云端模型调用。
+
+在 Render 既有 `atlas` 服务的 Environment 中保存密钥，并设置：
+
+```text
+LLM_PROVIDER=deepseek
+DEEPSEEK_API_KEY=你的密钥（仅保存在服务器环境变量中）
+DEEPSEEK_MODEL=deepseek-flash
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_TIMEOUT=90
+```
+
+API 只用于理解自然语言和润色结果解释；结构化内容经过校验和用户确认，正式计划仍由 CP-SAT 求解。配置密钥后应实际测试一次解析，而非只看健康检查的 Provider 字段。
+
+模型和接口设置依据 [DeepSeek 官方接入说明](https://api-docs.deepseek.com/zh-cn/) 及 [Chat Completions 文档](https://api-docs.deepseek.com/zh-cn/api/create-chat-completion/)。若使用兼容网关，请按网关支持的模型配置 `DEEPSEEK_MODEL`。
+
+GitHub 源码提交不会自动保证 Render 上线；部署时应指定验证过的提交，等待状态为 live，再核对公网 `/api/health` 的版本及浏览器功能。网站继续使用原网址，无需新域名。
+
+## 范围
+
+本次没有增加账户体系、完整资源管理或新的场景。上一份分析报告的其他能力边界仍适用；其中并发日历遮挡及超长文本缺少提示的问题已在本次处理。
+
+## 本地验证
+
+- TypeScript 检查及 Vite 生产构建通过。
+- 后端相关回归测试：44 通过、1 项真实模型测试因未配置密钥跳过；最终接口参数调整后，22 项边界测试再次通过。
+- 浏览器实际调用后端：五个场景均能生成计划，并验证并发活动分列且可点击、超长导入文本提示、版本显示及 390px 手机导航；没有页面异常或控制台错误。
