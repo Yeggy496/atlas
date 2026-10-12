@@ -25,6 +25,24 @@ def request_options(provider: str) -> dict:
     return {'thinking': {'type': 'disabled'}} if provider == 'deepseek' else {}
 
 
+def parse_failure_message(error: Exception) -> str:
+    # Never include raw exception text: it can contain credentials, URLs or model input.
+    prefix = '模型解析未成功：'
+    if isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+        hint = ('请检查密钥权限或网关访问限制。' if status in (401, 403) else
+                '请求频率或额度受限，请稍后重试。' if status == 429 else
+                '请检查接口地址、模型名称及网关支持的请求格式。')
+        return f'{prefix}模型接口返回 HTTP {status}。{hint}'
+    if isinstance(error, httpx.TimeoutException):
+        return prefix + '模型接口请求超时，请稍后重试或调整服务端超时设置。'
+    if isinstance(error, httpx.RequestError):
+        if 'CERTIFICATE_VERIFY_FAILED' in str(error):
+            return prefix + '模型接口 HTTPS 证书校验失败，请检查网关证书配置。'
+        return prefix + '服务器无法连接模型接口，请检查地址和网络可达性。'
+    return prefix + '模型返回数据未通过 JSON 或任务约束校验，请重试或使用手工约束。'
+
+
 class APIProvider:
     def __init__(self, provider: str):
         self.provider = provider
@@ -52,7 +70,7 @@ class APIProvider:
                 data=json.loads(content)
             return validate_parse(data,self.provider)
         except (httpx.HTTPError,KeyError,IndexError,TypeError,ValueError) as exc:
-            raise ValueError('模型解析未成功，请重试或使用手工约束。请检查服务端模型配置。') from exc
+            raise ValueError(parse_failure_message(exc)) from exc
 
 
     def schedule_directly(self, problem: Problem):

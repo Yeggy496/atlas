@@ -10,7 +10,7 @@ from openpyxl import Workbook
 import pytest
 
 from app.adapters import ADAPTERS
-from app.llm.providers import APIProvider
+from app.llm.providers import APIProvider, parse_failure_message
 from app.main import app
 from app.schemas import Assignment
 from app.solver.engine import preference_summary, solve
@@ -64,6 +64,26 @@ def test_model_network_failure_does_not_crash(monkeypatch, failure):
     with patch('app.llm.providers.httpx.Client.post', side_effect=error):
         with pytest.raises(ValueError, match='模型解析未成功'):
             APIProvider('openai').parse_constraints(ADAPTERS['life'](), '新增会议')
+
+
+@pytest.mark.parametrize('status', [400, 401, 403, 404, 429, 503])
+def test_model_http_errors_identify_status_without_leaking_secrets(status):
+    request = httpx.Request('POST', 'https://example.invalid/private?key=SECRET_TEST_VALUE')
+    error = httpx.HTTPStatusError('Bearer SECRET_TEST_VALUE', request=request,
+                                  response=httpx.Response(status, request=request))
+    message = parse_failure_message(error)
+    assert f'HTTP {status}' in message
+    assert 'SECRET_TEST_VALUE' not in message
+    assert 'example.invalid' not in message
+
+
+def test_model_tls_and_timeout_errors_are_distinguishable():
+    request = httpx.Request('POST', 'https://example.invalid')
+    tls = httpx.ConnectError('CERTIFICATE_VERIFY_FAILED SECRET_TEST_VALUE', request=request)
+    timeout = httpx.ReadTimeout('SECRET_TEST_VALUE', request=request)
+    assert '证书校验失败' in parse_failure_message(tls)
+    assert '请求超时' in parse_failure_message(timeout)
+    assert 'SECRET_TEST_VALUE' not in parse_failure_message(tls) + parse_failure_message(timeout)
 
 
 @pytest.mark.parametrize('filetype', ['csv', 'xlsx'])
