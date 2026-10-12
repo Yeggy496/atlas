@@ -2,6 +2,7 @@
 from io import BytesIO
 import json
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import httpx
 from fastapi.testclient import TestClient
@@ -11,6 +12,8 @@ import pytest
 from app.adapters import ADAPTERS
 from app.llm.providers import APIProvider
 from app.main import app
+from app.schemas import Assignment
+from app.solver.engine import preference_summary, solve
 
 
 @pytest.mark.parametrize('provider', ['openai', 'deepseek'])
@@ -84,3 +87,64 @@ def test_fractional_xlsx_minutes_are_not_silently_truncated():
     with TestClient(app, raise_server_exceptions=False) as client:
         response = client.post('/api/import', data={'problem_json': ADAPTERS['life']().model_dump_json()}, files={'file': ('fraction.xlsx', output.getvalue())})
     assert response.status_code == 422
+def test_unknown_timeout_still_returns_a_diagnosis(monkeypatch):
+    """A timeout (UNKNOWN) is not proven infeasible, but /api/solve must still
+    return an actionable diagnosis instead of a bare status."""
+    monkeypatch.setenv('ATLAS_DIAGNOSIS_SECONDS', '0.3')
+    problem = ADAPTERS['lab']()
+    unknown = {
+        'status': 'UNKNOWN',
+        'assignments': [],
+        'metrics': {'solve_time': 0.01, 'activities': len(problem.activities), 'resources': len(problem.resources), 'constraints': len(problem.constraints), 'variables': 0, 'model_constraints': 0},
+        'objective': None,
+        'conflicts': [],
+        'repairs': [],
+    }
+    with patch('app.main.solve', return_value=unknown):
+        with TestClient(app, raise_server_exceptions=False) as client:
+            response = client.post('/api/solve', json={'problem': problem.model_dump(), 'reviewed': True, 'mode': 'balanced', 'previous': []})
+    assert response.status_code == 200
+    body = response.json()
+    assert body['status'] == 'UNKNOWN'
+    assert body['conflicts'], 'a timeout must still surface a diagnosis'
+    joined = ' '.join(c['title'] + c['detail'] for c in body['conflicts'])
+    assert '未证明无解' in joined or '时限' in joined
+
+def test_preference_summary_is_defensive_against_non_window_soft_constraints():
+    """A5 regression guard: the soft-preference metric must count only
+    preferred_window constraints and must degrade gracefully (no crash, no
+    miscount) when a future soft constraint type has no day-local window."""
+    problem = ADAPTERS['life']()
+    activity_map = {a.id: a for a in problem.activities}
+    result = [Assignment(**row) for row in solve(problem, seconds=2)['assignments']]
+    soft = [c for c in problem.constraints if c.level == 'soft']
+    assert soft, 'the life adapter is expected to declare soft preferences'
+    total, satisfied = preference_summary(problem, result, activity_map)
+    assert total == len(soft)
+    assert 0 <= satisfied <= total
+
+    # A soft constraint without a usable window (a future non-window type, or an
+    # inverted window) must be skipped rather than raising or being counted.
+    future = problem.model_copy(deep=True)
+    future.constraints = problem.constraints + [
+        SimpleNamespace(level='soft', type='recurrence', day=None),
+        SimpleNamespace(level='soft', type='preferred_window', day=None, start=10, end=4),
+    ]
+    assert preference_summary(future, result, activity_map) == (total, satisfied)
+
+def test_api_provider_honours_base_url_and_timeout_overrides(monkeypatch):
+    """Real gateways need a custom base URL and a longer timeout than the 35s
+    default; both must be read from the *_BASE_URL / *_TIMEOUT environment."""
+    monkeypatch.setenv('OPENAI_API_KEY', 'TEST_ONLY_PLACEHOLDER')
+    monkeypatch.setenv('OPENAI_BASE_URL', 'https://gateway.example/v1/')
+    monkeypatch.setenv('OPENAI_TIMEOUT', '120')
+    problem = ADAPTERS['life']()
+    data = {'problem': problem.model_dump(), 'summary': ['保持原任务'], 'warnings': []}
+    response = httpx.Response(200, json={'choices': [{'message': {'content': json.dumps(data)}}]}, request=httpx.Request('POST', 'https://example.invalid'))
+    with patch('app.llm.providers.httpx.Client') as model_client:
+        client = model_client.return_value.__enter__.return_value
+        client.post.return_value = response
+        APIProvider('openai').parse_constraints(problem, '保持原任务')
+    assert model_client.call_args.kwargs['timeout'] == 120.0
+    posted_url = client.post.call_args.args[0]
+    assert posted_url == 'https://gateway.example/v1/chat/completions'

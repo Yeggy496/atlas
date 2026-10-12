@@ -13,7 +13,7 @@ from app.importer import import_table
 from app.main import app
 
 
-@pytest.mark.parametrize('scenario',['life','academic','lab'])
+@pytest.mark.parametrize('scenario',['life','academic','lab','meeting','production'])
 def test_each_adapter_produces_legal_schedule(scenario):
     problem=ADAPTERS[scenario]()
     result=solve(problem,seconds=4)
@@ -76,6 +76,42 @@ def test_capacity_two_and_precedence():
     assert solve(p,seconds=.5)['status']=='INFEASIBLE'
 
 
+def _consecutive_problem():
+    return Problem(scenario='academic',name='连排校验',resources=[Resource(id='room',name='教室',type='room',seats=30)],
+        activities=[Activity(id='a',name='A',duration=2,resources=['room'],days=[0],window_start=16,window_end=24),
+                    Activity(id='b',name='B',duration=2,resources=['room'],days=[0],window_start=16,window_end=24)],
+        constraints=[Constraint(id='con',label='A与B连排',type='consecutive',target='a',other='b')])
+
+
+def test_consecutive_constraint_links_two_activities_back_to_back():
+    p=_consecutive_problem()
+    result=solve(p,seconds=1)
+    assert result['status'] in ('OPTIMAL','FEASIBLE')
+    by={x['activity_id']:x for x in result['assignments']}
+    assert by['b']['start']==by['a']['end']
+    assert verify(p,[Assignment(**x) for x in result['assignments']])==[]
+
+
+def test_consecutive_requires_a_second_activity():
+    with pytest.raises(ValidationError):
+        Constraint(id='bad',label='缺后续活动',type='consecutive',target='a')
+
+
+def test_validator_rejects_non_adjacent_consecutive():
+    p=_consecutive_problem()
+    broken=[Assignment(activity_id='a',start=16,end=18,room_id='room'),
+            Assignment(activity_id='b',start=20,end=22,room_id='room')]
+    assert verify(p,broken)
+
+
+def test_demo_parser_links_two_activities_back_to_back():
+    parsed=DemoProvider().parse_constraints(ADAPTERS['academic'](),'机器学习1和机器学习2连排。')
+    changed=Problem.model_validate(parsed['problem'])
+    demo=[c for c in changed.constraints if c.type=='consecutive' and c.source=='demo_parser']
+    assert demo and demo[-1].target=='ml0' and demo[-1].other=='ml1'
+
+
+
 def test_validator_rejects_deliberately_corrupted_result():
     p=ADAPTERS['life']()
     result=solve(p,seconds=4)
@@ -118,3 +154,30 @@ def test_production_build_is_served_from_project_directory():
         assert response.status_code==200
         assert 'ATLAS' in response.text
         assert 'text/html' in response.headers['content-type']
+
+def test_production_jobs_keep_operation_order():
+    problem=ADAPTERS['production']()
+    result=solve(problem,mode='balanced',seconds=5)
+    assert result['status'] in ('OPTIMAL','FEASIBLE')
+    assignments=[Assignment(**a) for a in result['assignments']]
+    assert verify(problem,assignments)==[]
+    by={a.activity_id:a for a in assignments}
+    groups={}
+    for a in problem.activities:
+        if a.group:
+            groups.setdefault(a.group,[]).append(a)
+    # 三个工单各自保持 切削 -> 装配 -> 质检 的先后顺序
+    assert len(groups)==3
+    for members in groups.values():
+        members.sort(key=lambda a:a.op_index)
+        assert [a.op_index for a in members]==[0,1,2]
+        for prev,nxt in zip(members,members[1:]):
+            assert by[prev.id].end<=by[nxt.id].start
+
+
+def test_group_operation_index_must_be_contiguous():
+    base={'scenario':'production','name':'工序序号校验','activities':[
+        {'id':'j0','name':'切削','duration':2,'category':'operation','room_options':['mill1'],'group':'J','op_index':0,'days':[0],'window_start':16,'window_end':40},
+        {'id':'j2','name':'质检','duration':2,'category':'operation','resources':['assembly'],'group':'J','op_index':2,'days':[0],'window_start':16,'window_end':40}]}
+    with pytest.raises(ValidationError):
+        Problem.model_validate(base)

@@ -171,3 +171,19 @@
   margin-top: 16px;
   font-size: 10px;
 }
+
+.activity-row.activity-group {
+  align-items: flex-start;
+  background: #fbfcff;
+  border: 1px solid #ecf0f8;
+  border-radius: 6px;
+  padding: 10px 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid #ecf0f8;
+}
+.activity-row.activity-group .icon-button {
+  margin-top: 1px;
+}
+.activity-group small {
+  color: #95a2ba;
+}

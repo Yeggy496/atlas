@@ -1,4 +1,11 @@
-"""Strict CSV/XLSX template import; structured files are not sent to a model."""
+"""Strict CSV/XLSX template import; structured files are not sent to a model.
+
+TXT/PDF are handled by a separate, clearly-scoped path: they carry unstructured
+text, so we only extract plain text deterministically and hand it to the existing
+natural-language constraint pipeline (``/api/constraints/parse``). Per MASTER_SPEC
+§11, "能用确定性程序解决的，不交给大模型猜" — extraction is deterministic; only
+the already-existing NL understanding step sees a model.
+"""
 import csv
 from decimal import Decimal, InvalidOperation
 from io import StringIO, BytesIO
@@ -64,3 +71,63 @@ def import_table(problem:Problem, filename:str, content:bytes):
         p.activities.append(a)
         summary.append(f'导入 {name} · {minutes} 分钟')
     return {'problem':Problem.model_validate(p.model_dump()).model_dump(),'summary':summary,'requires_review':True}
+
+
+# --------------------------------------------------------------------------- #
+# Unstructured text import (TXT / PDF) — MASTER_SPEC §11.
+# These only extract plain text; they never add activities or constraints.
+# The extracted text is returned to the caller, which forwards it to the
+# existing natural-language constraint pipeline for user review.
+# --------------------------------------------------------------------------- #
+
+MAX_TEXT_CHARS = 20_000
+TEXT_SUFFIXES = ('.txt',)
+PDF_SUFFIXES = ('.pdf',)
+
+
+def extract_text(filename: str, content: bytes) -> dict:
+    """Extract plain text from a .txt or .pdf file without interpreting it.
+
+    Deterministic by design: TXT is decoded (UTF-8/GB18030 fallback), PDF text is
+    read page by page with pypdf when it is installed. Nothing here guesses at
+    tasks or constraints — that is the job of the reviewed NL pipeline.
+    """
+    if len(content) > 2_000_000:
+        raise ValueError('演示版文件最大为 2 MB。')
+    name = filename.lower()
+    if name.endswith(TEXT_SUFFIXES):
+        text = _decode_text(content)
+        kind = 'txt'
+    elif name.endswith(PDF_SUFFIXES):
+        text = _extract_pdf(content)
+        kind = 'pdf'
+    else:
+        raise ValueError('文本导入支持 TXT 和 PDF；结构化数据请使用 CSV / XLSX 模板。')
+    text = text.strip()
+    if not text:
+        raise ValueError('未能从文件中提取到文字。扫描版 PDF 需要先做 OCR。')
+    if len(text) > MAX_TEXT_CHARS:
+        text = text[:MAX_TEXT_CHARS]
+    return {'kind': kind, 'text': text, 'chars': len(text)}
+
+
+def _decode_text(content: bytes) -> str:
+    for encoding in ('utf-8-sig', 'utf-8', 'gb18030'):
+        try:
+            return content.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+    raise ValueError('无法识别文本编码，请另存为 UTF-8。')
+
+
+def _extract_pdf(content: bytes) -> str:
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:
+        raise ValueError('服务器未安装 PDF 解析组件（pypdf）。请改用 TXT，或让管理员安装依赖。') from exc
+    try:
+        reader = PdfReader(BytesIO(content))
+        pages = [(page.extract_text() or '').strip() for page in reader.pages]
+    except Exception as exc:  # noqa: BLE001 - surface any pdf parse failure as a friendly 422
+        raise ValueError('PDF 解析失败，请确认文件未加密且非扫描件。') from exc
+    return '\n'.join(page for page in pages if page)

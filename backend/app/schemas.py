@@ -2,8 +2,8 @@
 from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
-Scenario = Literal['life', 'academic', 'lab']
-ConstraintType = Literal['fixed_time', 'time_window', 'unavailable', 'preferred_window', 'deadline', 'precedence', 'daily_limit', 'min_gap']
+Scenario = Literal['life', 'academic', 'lab', 'meeting', 'production']
+ConstraintType = Literal['fixed_time', 'time_window', 'unavailable', 'preferred_window', 'deadline', 'precedence', 'daily_limit', 'min_gap', 'consecutive']
 
 
 class Resource(BaseModel):
@@ -30,6 +30,8 @@ class Activity(BaseModel):
     window_end: int = Field(default=44, ge=1, le=48)
     optional: bool = False
     priority: int = Field(default=5, ge=1, le=10)
+    group: str | None = Field(default=None, description='工单/任务组 ID，用于把多道工序联成一个任务')
+    op_index: int = Field(default=0, ge=0, description='同一 group 内的工序顺序，从 0 开始')
 
     @model_validator(mode='after')
     def validate_days(self):
@@ -66,8 +68,8 @@ class Constraint(BaseModel):
                 raise ValueError('时间窗口必须在一天内且起点早于终点。')
         if self.type == 'fixed_time' and (self.day is None or self.start >= 48):
             raise ValueError('固定时间必须包含日期和当天的开始时刻。')
-        if self.type in ('precedence', 'min_gap') and not self.other:
-            raise ValueError('前置关系或间隔约束必须指定第二项活动。')
+        if self.type in ('precedence', 'min_gap', 'consecutive') and not self.other:
+            raise ValueError('前置关系、间隔或连排约束必须指定第二项活动。')
         return self
 
 
@@ -96,8 +98,15 @@ class Problem(BaseModel):
                 raise ValueError(f'约束「{c.label}」的目标不存在。')
             if c.other is not None and c.other not in acts:
                 raise ValueError('关联任务不存在。')
-            if c.type in ('fixed_time', 'precedence', 'min_gap') and c.target not in acts:
-                raise ValueError('固定时间、前置关系与间隔约束必须指向具体活动。')
+            if c.type in ('fixed_time', 'precedence', 'min_gap', 'consecutive') and c.target not in acts:
+                raise ValueError('固定时间、前置关系、间隔与连排约束必须指向具体活动。')
+        groups = {}
+        for a in self.activities:
+            if a.group:
+                groups.setdefault(a.group, []).append(a.op_index)
+        for gid, idxs in groups.items():
+            if sorted(idxs) != list(range(len(idxs))):
+                raise ValueError(f'工单 {gid} 的工序序号必须从 0 开始且不重复。')
         return self
 
 
@@ -113,6 +122,10 @@ class SolveRequest(BaseModel):
     reviewed: bool = False
     mode: Literal['efficient', 'balanced', 'robust'] = 'balanced'
     previous: list[Assignment] = Field(default_factory=list, max_length=100)
+    # Optional per-objective weight overrides on top of the chosen preset
+    # (MASTER_SPEC §15). Only the seven known objective keys are honoured; any
+    # other key, or a negative/non-numeric value, is ignored by the solver.
+    weights: dict[str, float] | None = Field(default=None)
 
 
 class ParseRequest(BaseModel):
@@ -122,3 +135,27 @@ class ParseRequest(BaseModel):
 
 class RepairRequest(SolveRequest):
     constraint_id: str
+
+
+class ExplainRequest(BaseModel):
+    problem: Problem
+    assignments: list[Assignment] = Field(default_factory=list, max_length=100)
+    activity_id: str = Field(min_length=1, max_length=120)
+    previous: list[Assignment] = Field(default_factory=list, max_length=100)
+
+
+class CompareRequest(BaseModel):
+    """Compare two schedules of the same problem (MASTER_SPEC §16, §37)."""
+    problem: Problem
+    previous: list[Assignment] = Field(default_factory=list, max_length=100)
+    current: list[Assignment] = Field(default_factory=list, max_length=100)
+
+
+class ExportRequest(BaseModel):
+    """Export a solved run (MASTER_SPEC §25 P2).
+
+    The caller sends back the problem plus the exact solve result it displayed, so
+    the exported file is always a faithful copy of what the user saw.
+    """
+    problem: Problem
+    result: dict = Field(default_factory=dict)

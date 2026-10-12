@@ -1,0 +1,33 @@
+#!/bin/sh
+# ATLAS-Sigma pre-commit guard (A4).
+#
+# The deployed bundle in frontend/dist is committed and served by FastAPI, so a
+# frontend source change that is committed without rebuilding ships a stale UI.
+# This hook blocks exactly that mistake: if any frontend source or build config
+# is staged, frontend/dist must be staged in the same commit too.
+#
+# Enable once per clone:  git config core.hooksPath .githooks
+# Bypass for an intentional exception:  git commit --no-verify
+
+set -eu
+
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+source_changed=$(printf '%s\n' "$staged" | grep -E '^frontend/(src/|public/|index\.html$|vite\.config\.|tsconfig.*\.json$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|tailwind\.config\.|postcss\.config\.)' || true)
+dist_changed=$(printf '%s\n' "$staged" | grep -E '^frontend/dist/' || true)
+
+if [ -n "$source_changed" ] && [ -z "$dist_changed" ]; then
+    echo ""
+    echo "  pre-commit: frontend sources are staged but frontend/dist is not." >&2
+    echo "" >&2
+    echo "  The committed bundle is what the live demo serves, so rebuild first:" >&2
+    echo "" >&2
+    echo "      scripts/build_frontend.ps1     # or: cd frontend && pnpm build" >&2
+    echo "      git add frontend/dist          # then commit again" >&2
+    echo "" >&2
+    echo "  Staged frontend files:" >&2
+    printf '      %s\n' $source_changed >&2
+    exit 1
+fi
+
+exit 0

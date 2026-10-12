@@ -11,6 +11,7 @@ from ..schemas import Problem, Activity, Constraint
 
 class LLMProvider(Protocol):
     def parse_constraints(self, problem: Problem, text: str) -> dict: ...
+    def schedule_directly(self, problem: Problem): ...
 
 
 class ParsedConstraints(BaseModel):
@@ -28,14 +29,16 @@ class APIProvider:
         key = os.getenv(f'{prefix}_API_KEY','')
         if not key:
             raise ValueError(f'尚未配置 {prefix}_API_KEY。可切换离线演示解析或手工编辑约束。')
-        base = 'https://api.openai.com/v1' if self.provider=='openai' else 'https://api.deepseek.com'
+        default_base = 'https://api.openai.com/v1' if self.provider=='openai' else 'https://api.deepseek.com'
+        base = (os.getenv(f'{prefix}_BASE_URL') or default_base).rstrip('/')
         model = os.getenv(f'{prefix}_MODEL','gpt-4.1-mini' if self.provider=='openai' else 'deepseek-chat')
+        timeout = float(os.getenv(f'{prefix}_TIMEOUT', '35'))
         prompt = ('你是约束解析器，不安排日程。只返回 JSON 对象，包含 problem（完整修改后的问题）、summary（变更说明字符串数组）、warnings（歧义或不支持项字符串数组）。'
                   '每个 slot=30分钟，周一=0，start/end是当天slot；deadline.end是从周一00:00开始的slot。必须保留未修改的输入。'
                   '不能凭空创造课程、设备或人员，未知实体和歧义写入warnings。只使用给定Schema支持的类型。preferred_window必须soft，其余hard。'
                   '重复活动展开为独立实例；学习可拆分为多项；不得输出调度结果、代码或表达式。Schema:\n'+json.dumps(Problem.model_json_schema(),ensure_ascii=False))
         try:
-            with httpx.Client(timeout=35) as client:
+            with httpx.Client(timeout=timeout) as client:
                 response=client.post(base+'/chat/completions',headers={'Authorization':f'Bearer {key}'},json={'model':model,'temperature':0,'response_format':{'type':'json_object'},'messages':[{'role':'system','content':prompt},{'role':'user','content':json.dumps({'current_problem':problem.model_dump(),'request':text},ensure_ascii=False)}]})
                 response.raise_for_status()
                 content=response.json()['choices'][0]['message']['content']
@@ -45,6 +48,64 @@ class APIProvider:
             return validate_parse(data,self.provider)
         except (httpx.HTTPError,KeyError,IndexError,TypeError,ValueError) as exc:
             raise ValueError('模型解析未成功，请重试或使用手工约束。请检查服务端模型配置。') from exc
+
+
+    def schedule_directly(self, problem: Problem):
+        """Ask the model to schedule everything in one shot (Direct-LLM baseline).
+
+        This is the comparison baseline the report needs, so it deliberately does
+        NOT go through CP-SAT. The raw model output is only parsed and trimmed to
+        known activity ids; the independent validator then measures the real hard
+        constraint violations of whatever the model produced.
+        """
+        prefix = self.provider.upper()
+        key = os.getenv(f'{prefix}_API_KEY', '')
+        if not key:
+            raise ValueError(f'尚未配置 {prefix}_API_KEY，无法运行 Direct-LLM 基线。')
+        default_base = 'https://api.openai.com/v1' if self.provider == 'openai' else 'https://api.deepseek.com'
+        base = (os.getenv(f'{prefix}_BASE_URL') or default_base).rstrip('/')
+        model = os.getenv(f'{prefix}_MODEL', 'gpt-4.1-mini' if self.provider == 'openai' else 'deepseek-chat')
+        timeout = float(os.getenv(f'{prefix}_TIMEOUT', '35'))
+        payload = {'activities': [a.model_dump() for a in problem.activities],
+                   'resources': [r.model_dump() for r in problem.resources],
+                   'constraints': [c.model_dump() for c in problem.constraints]}
+        prompt = ('你是排程助手。请直接给出完整可行的周日程，只返回 JSON 对象 '
+                  '{"assignments":[{"activity_id":..., "start":..., "end":..., "room_id":...}]}。'
+                  '每个 slot 为 30 分钟，周一 00:00 为 0；room_id 无教室时用 null。不要解释，不要输出代码。')
+        try:
+            with httpx.Client(timeout=timeout) as client:
+                response = client.post(base + '/chat/completions', headers={'Authorization': f'Bearer {key}'},
+                                       json={'model': model, 'temperature': 0,
+                                             'response_format': {'type': 'json_object'},
+                                             'messages': [{'role': 'system', 'content': prompt},
+                                                          {'role': 'user', 'content': json.dumps(payload, ensure_ascii=False)}]})
+                response.raise_for_status()
+                content = response.json()['choices'][0]['message']['content']
+                if not isinstance(content, str):
+                    raise ValueError('模型未返回 JSON 文本。')
+                data = json.loads(content)
+        except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError) as exc:
+            raise ValueError('模型直接排程未成功，请重试或稍后再跑对比。') from exc
+        return validate_schedule(data, problem)
+
+
+def validate_schedule(data, problem: Problem):
+    """Keep only well-formed assignments whose activity id exists in the problem."""
+    from ..schemas import Assignment
+    items = data.get('assignments') if isinstance(data, dict) else data
+    if not isinstance(items, list):
+        raise ValueError('模型未返回日程数组。')
+    known = {a.id for a in problem.activities}
+    out = []
+    for item in items:
+        if not isinstance(item, dict) or item.get('activity_id') not in known:
+            continue
+        try:
+            out.append(Assignment(activity_id=item['activity_id'], start=int(item['start']),
+                                  end=int(item['end']), room_id=item.get('room_id')))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
 
 
 def validate_parse(data, provider):
@@ -133,6 +194,14 @@ class DemoProvider:
                 for a in p.activities:
                     if '机器学习' in a.name: a.duration=4
                 summary.append('机器学习每次连续 2 小时（演示课时为 60 分钟）'); mark(r'机器学习')
+            if re.search(r'连排|连堂|相邻|紧接|紧挨|接着',text):
+                flat=text.replace(' ','')
+                mentioned=[a for a in p.activities if a.name.replace(' ','') in flat]
+                if len(mentioned)>=2:
+                    a,b=mentioned[0],mentioned[1]
+                    p.constraints=[c for c in p.constraints if not(c.type=='consecutive' and c.target==a.id)]
+                    p.constraints.append(Constraint(id=f'consec_{token}',label=f'{a.name} 与 {b.name} 连排',type='consecutive',target=a.id,other=b.id,source='demo_parser'))
+                    summary.append(f'{a.name} 与 {b.name} 连续排布'); mark(r'连排|连堂|相邻|紧接|紧挨|接着')
             if '数据库实验' in text and '计算机实验室' in text:
                 for a in p.activities:
                     if '数据库实验' in a.name: a.room_type='computer'

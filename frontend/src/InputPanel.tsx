@@ -5,6 +5,7 @@ import {
   Loader2,
   Upload,
   Download,
+  FileText,
   CheckCheck,
   Plus,
   LockKeyhole,
@@ -24,8 +25,10 @@ import {
   type Mode,
   type Scenario,
   type Assignment,
+  type WeightsMeta,
   CATEGORIES,
 } from "./types";
+import { WeightPanel } from "./WeightPanel";
 interface Props {
   problem: Problem | null;
   busy: string;
@@ -41,15 +44,25 @@ interface Props {
   setConstraintEditor: (v: Constraint | "new" | null) => void;
   deleteConstraint: (v: Constraint) => void;
   deleteActivity: (v: Activity) => void;
+  editActivity: (v: Activity) => void;
   mode: Mode;
   setMode: (v: Mode) => void;
+  weightsMeta: WeightsMeta | null;
+  customWeights: Record<string, number> | null;
+  setCustomWeights: (v: Record<string, number> | null) => void;
   setHelp: (v: boolean) => void;
   reviewed: boolean;
   setReviewed: (v: boolean) => void;
-  optimize: () => Promise<void>;
+  optimize: (
+    modeOverride?: Mode,
+    fresh?: boolean,
+    weightsOverride?: Record<string, number> | null,
+  ) => Promise<void>;
   previous: RefObject<Assignment[]>;
   fileRef: RefObject<HTMLInputElement | null>;
   importFile: (f: File) => Promise<void>;
+  textFileRef: RefObject<HTMLInputElement | null>;
+  importText: (f: File) => Promise<void>;
 }
 const MODES: { id: Mode; label: string; icon: typeof Zap }[] = [
   { id: "efficient", label: "高效", icon: Zap },
@@ -72,8 +85,12 @@ export function InputPanel({
   setConstraintEditor,
   deleteConstraint,
   deleteActivity,
+  editActivity,
   mode,
   setMode,
+  weightsMeta,
+  customWeights,
+  setCustomWeights,
   setHelp,
   reviewed,
   setReviewed,
@@ -81,7 +98,19 @@ export function InputPanel({
   previous,
   fileRef,
   importFile,
+  textFileRef,
+  importText,
 }: Props) {
+  const activityGroups = new Map<string, Activity[]>();
+  for (const a of problem?.activities ?? []) {
+    if (a.group) {
+      const list = activityGroups.get(a.group) ?? [];
+      list.push(a);
+      activityGroups.set(a.group, list);
+    }
+  }
+  activityGroups.forEach((list) => list.sort((x, y) => x.op_index - y.op_index));
+  const renderedGroups = new Set<string>();
   return (
     <aside className="input-panel panel">
       <div className="input-panel-header">
@@ -128,6 +157,14 @@ export function InputPanel({
           <Upload size={14} />
           导入 CSV / XLSX
         </button>
+        <button
+          disabled={!!busy}
+          onClick={() => textFileRef.current?.click()}
+          title="导入 TXT / PDF 文本，自动识别其中的需求"
+        >
+          <FileText size={14} />
+          TXT / PDF
+        </button>
         <a href={`/api/import/template.csv?scenario=${scenario}`} download>
           <Download size={13} />
           模板
@@ -139,6 +176,15 @@ export function InputPanel({
           hidden
           onChange={(e) => {
             if (e.target.files?.[0]) void importFile(e.target.files[0]);
+          }}
+        />
+        <input
+          ref={textFileRef}
+          type="file"
+          accept=".txt,.pdf"
+          hidden
+          onChange={(e) => {
+            if (e.target.files?.[0]) void importText(e.target.files[0]);
           }}
         />
       </div>
@@ -226,27 +272,70 @@ export function InputPanel({
                 </div>
               </article>
             ))
-          : problem?.activities.map((a) => (
-              <article className="activity-row" key={a.id}>
-                <span
-                  className={`dot ${(CATEGORIES[a.category] ?? CATEGORIES.study).color}`}
-                />
-                <div>
-                  <strong>{a.name}</strong>
-                  <small>
-                    {a.duration / 2} 小时 · {a.optional ? "可选" : "必须完成"}
-                  </small>
-                </div>
-                <button
-                  className="icon-button"
-                  aria-label={`删除活动 ${a.name}`}
-                  disabled={!!busy}
-                  onClick={() => deleteActivity(a)}
-                >
-                  <Trash2 size={13} />
-                </button>
-              </article>
-            ))}
+          : problem?.activities.map((a) => {
+              if (a.group) {
+                if (renderedGroups.has(a.group)) return null;
+                renderedGroups.add(a.group);
+                const steps = activityGroups.get(a.group) ?? [a];
+                return (
+                  <article
+                    className="activity-row activity-group"
+                    key={a.group}
+                  >
+                    <span
+                      className={`dot ${(CATEGORIES.operation ?? CATEGORIES.study).color}`}
+                    />
+                    <div>
+                      <strong>{a.name.split(" · ").slice(0, 2).join(" · ")}</strong>
+                      <small>
+                        {steps.length} 道工序 ·{" "}
+                        {steps
+                          .map((s) => s.name.split(" · ").pop())
+                          .join(" → ")}
+                      </small>
+                    </div>
+                    <button
+                      className="icon-button"
+                      aria-label={`删除工单 ${a.name}`}
+                      disabled={!!busy}
+                      onClick={() => steps.forEach(deleteActivity)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </article>
+                );
+              }
+              return (
+                <article className="activity-row" key={a.id}>
+                  <span
+                    className={`dot ${(CATEGORIES[a.category] ?? CATEGORIES.study).color}`}
+                  />
+                  <div>
+                    <strong>{a.name}</strong>
+                    <small>
+                      {a.duration / 2} 小时 ·{" "}
+                      {a.optional ? "可选" : "必须完成"}
+                    </small>
+                  </div>
+                  <button
+                    className="icon-button"
+                    aria-label={`编辑活动 ${a.name}`}
+                    disabled={!!busy}
+                    onClick={() => editActivity(a)}
+                  >
+                    <Pencil size={13} />
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label={`删除活动 ${a.name}`}
+                    disabled={!!busy}
+                    onClick={() => deleteActivity(a)}
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </article>
+              );
+            })}
       </div>
       <div className="optimization-controls">
         <div className="controls-title">
@@ -265,8 +354,15 @@ export function InputPanel({
             <button
               key={m.id}
               disabled={!!busy}
-              onClick={() => setMode(m.id)}
-              className={mode === m.id ? "active" : ""}
+              onClick={() => {
+                setMode(m.id);
+                // Switching a preset drops any custom profile. The cleared profile
+                // must be passed explicitly because setCustomWeights is async and
+                // optimize() would otherwise still see the previous custom weights.
+                setCustomWeights(null);
+                void optimize(m.id, true, null);
+              }}
+              className={mode === m.id && !customWeights ? "active" : ""}
             >
               <m.icon size={13} />
               {m.label}
@@ -279,7 +375,18 @@ export function InputPanel({
             : mode === "balanced"
               ? "兼顾目标、时间紧凑与每日负载。"
               : "优先保留已有安排，并提前完成截止任务。"}
+          <span className="mode-hint">切换档位会立即按新偏好重新求解</span>
         </p>
+        <WeightPanel
+          meta={weightsMeta}
+          mode={mode}
+          weights={customWeights}
+          busy={!!busy}
+          onChange={setCustomWeights}
+          onApply={(override) =>
+            void optimize(mode, false, override === undefined ? customWeights : override)
+          }
+        />
         <label className="review-check">
           <input
             type="checkbox"
@@ -291,7 +398,7 @@ export function InputPanel({
         </label>
         <button
           className="optimize-button"
-          onClick={optimize}
+          onClick={() => void optimize()}
           disabled={!!busy || !reviewed || !problem}
         >
           {busy ? (

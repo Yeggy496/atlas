@@ -533,3 +533,34 @@ body:has(.modal-backdrop) .message.error {
     scroll-behavior: auto !important;
   }
 }
+
+.scenario-chips {
+  display: none;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 2px 0 14px;
+  scrollbar-width: thin;
+}
+.scenario-chip {
+  flex: 0 0 auto;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 16px;
+  border: 1px solid #e5eaf3;
+  background: #fff;
+  color: #7f8a9e;
+  font-size: 12px;
+  gap: 6px;
+  white-space: nowrap;
+}
+.scenario-chip.active {
+  color: #365bd6;
+  border-color: #c9d6fb;
+  background: #f7f9ff;
+  font-weight: 600;
+}
+@media (max-width: 760px) {
+  .scenario-chips {
+    display: flex;
+  }
+}

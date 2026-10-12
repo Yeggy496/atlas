@@ -13,6 +13,7 @@ import {
   ChevronRight,
   CircleHelp,
   Clock3,
+  Factory,
   FlaskConical,
   GraduationCap,
   History,
@@ -32,6 +33,7 @@ import {
   Trash2,
   Upload,
   UserRound,
+  Users,
   Workflow,
   X,
   Zap,
@@ -39,29 +41,45 @@ import {
   Download,
   CheckCircle2,
 } from "lucide-react";
-import { api, readResponse } from "./api";
+import { api, exportPlan as exportPlanRequest, readResponse } from "./api";
 import { Calendar } from "./Calendar";
 import { ActivityEditor, ConstraintEditor, Dialog } from "./Editors";
 import {
   type Activity,
   type Assignment,
   type Constraint,
+  type Explanation,
   type HistoryRun,
   type Mode,
   type Problem,
   type Result,
   type Scenario,
+  type WeightsMeta,
   CATEGORIES,
   DAYS,
   SCENARIOS,
   clock,
 } from "./types";
 
+const SCENARIO_ICONS: Record<Scenario, typeof CalendarDays> = {
+  life: CalendarDays,
+  academic: GraduationCap,
+  lab: FlaskConical,
+  meeting: Users,
+  production: Factory,
+};
+
 export default function App() {
   const [problem, setProblem] = useState<Problem | null>(null),
     [result, setResult] = useState<Result | null>(null);
   const [scenario, setScenario] = useState<Scenario>("life"),
     [mode, setMode] = useState<Mode>("balanced");
+  // Custom weight profile (MASTER_SPEC §15). null means "use the preset as-is";
+  // the slider panel populates it when the user switches to 自定义.
+  const [customWeights, setCustomWeights] = useState<Record<string, number> | null>(
+      null,
+    ),
+    [weightsMeta, setWeightsMeta] = useState<WeightsMeta | null>(null);
   const [busy, setBusy] = useState(""),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -80,9 +98,13 @@ export default function App() {
       Constraint | "new" | null
     >(null),
     [addingActivity, setAddingActivity] = useState(false),
+    [editingActivity, setEditingActivity] = useState<Activity | null>(null),
     [selected, setSelected] = useState<Assignment | null>(null),
+    [explanation, setExplanation] = useState<Explanation | null>(null),
+    [explainBusy, setExplainBusy] = useState(false),
     [help, setHelp] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null),
+    textFileRef = useRef<HTMLInputElement>(null),
     previous = useRef<Assignment[]>([]),
     loadCounter = useRef(0);
 
@@ -94,6 +116,7 @@ export default function App() {
     setResult(null);
     setSummary([]);
     setWarnings([]);
+    setCustomWeights(null);
     previous.current = [];
     setReviewed(true);
     setScenario(s);
@@ -123,6 +146,10 @@ export default function App() {
     api<{ provider: string }>("/health")
       .then((x) => setProvider(x.provider))
       .catch(() => setError("暂时无法连接后端，请确认服务已启动。"));
+    // Weight dimensions come from the solver so the UI never hard-codes them.
+    api<WeightsMeta>("/weights")
+      .then((x) => setWeightsMeta(x))
+      .catch(() => setWeightsMeta(null));
     void load("life");
   }, []);
   useEffect(() => {
@@ -130,15 +157,57 @@ export default function App() {
     const t = setTimeout(() => setNotice(""), 5000);
     return () => clearTimeout(t);
   }, [notice]);
-  function draft(p: Problem) {
+  useEffect(() => {
+    if (
+      !selected ||
+      !problem ||
+      !result ||
+      !["FEASIBLE", "OPTIMAL"].includes(result.status)
+    ) {
+      setExplanation(null);
+      setExplainBusy(false);
+      return;
+    }
+    let cancelled = false;
+    setExplainBusy(true);
+    setExplanation(null);
+    api<Explanation>("/explain", {
+      problem,
+      assignments: result.assignments,
+      activity_id: selected.activity_id,
+      previous: [],
+    })
+      .then((data) => {
+        if (!cancelled) setExplanation(data);
+      })
+      .catch(() => {
+        if (!cancelled) setExplanation(null);
+      })
+      .finally(() => {
+        if (!cancelled) setExplainBusy(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selected, problem, result]);
+  function draft(p: Problem | ((current: Problem | null) => Problem | null)) {
     setProblem(p);
     setResult(null);
     setReviewed(false);
     setError("");
     setSelected(null);
   }
-  async function optimize() {
+  async function optimize(
+    selectedMode: Mode = mode,
+    fresh = false,
+    // Explicit weight profile for this call. React state updates are async, so a
+    // caller that has just changed the profile (e.g. a preset switch clearing the
+    // custom weights) must pass it here instead of relying on the closure.
+    weightsOverride?: Record<string, number> | null,
+  ) {
     if (!problem || !reviewed) return;
+    const effectiveWeights =
+      weightsOverride === undefined ? customWeights : weightsOverride;
     setBusy("正在组合优化");
     setError("");
     setSelected(null);
@@ -146,13 +215,16 @@ export default function App() {
       const r = await api<Result>("/solve", {
         problem,
         reviewed,
-        mode,
-        previous: previous.current,
+        mode: selectedMode,
+        previous: fresh ? [] : previous.current,
+        ...(effectiveWeights ? { weights: effectiveWeights } : {}),
       });
       setResult(r);
       if (r.assignments.length) previous.current = r.assignments;
       if (r.status === "INFEASIBLE")
         setNotice("检测到约束冲突，已生成诊断结果。");
+      else if (r.status === "UNKNOWN")
+        setNotice("求解达到时限，已给出可诊断的方向与放宽候选。");
       else if (!["FEASIBLE", "OPTIMAL"].includes(r.status))
         setError("限时内未获得合法解，请减少任务或放宽时间域后重试。");
       else setNotice(`已生成合法计划 · ${r.assignments.length} 项活动`);
@@ -210,6 +282,33 @@ export default function App() {
       if (fileRef.current) fileRef.current.value = "";
     }
   }
+  async function importText(file: File) {
+    if (!problem) return;
+    setBusy("正在读取文本");
+    setError("");
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      const response = await fetch("/api/import/text", {
+        method: "POST",
+        body: form,
+      });
+      const data = await readResponse<{ kind: string; text: string; chars: number }>(
+        response,
+      );
+      // 提取出的文本进入已有解析管线，不直接改写问题（规格 §11：确定性提取优先）。
+      setInput(data.text);
+      setInputTab("constraints");
+      setNotice(
+        `已从 ${data.kind.toUpperCase()} 提取 ${data.chars} 个字符，请点击“识别约束”再确认。`,
+      );
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy("");
+      if (textFileRef.current) textFileRef.current.value = "";
+    }
+  }
   async function conflict() {
     if (!problem) return;
     setBusy("正在建立冲突样例");
@@ -237,6 +336,7 @@ export default function App() {
         problem,
         reviewed: true,
         mode,
+        ...(customWeights ? { weights: customWeights } : {}),
         previous: previous.current,
         constraint_id,
       });
@@ -272,26 +372,37 @@ export default function App() {
     });
   }
   function deleteActivity(a: Activity) {
-    if (!problem) return;
-    draft({
-      ...problem,
-      activities: problem.activities.filter((x) => x.id !== a.id),
-      constraints: problem.constraints.filter(
+    // Group deletions are batched by React: apply each removal to the latest draft.
+    draft((current) => current ? {
+      ...current,
+      activities: current.activities.filter((x) => x.id !== a.id),
+      constraints: current.constraints.filter(
         (c) => c.target !== a.id && c.other !== a.id,
       ),
-    });
+    } : current);
   }
-  function exportPlan() {
+  function exportPlan(format: "json" | "xlsx" | "pdf" = "json") {
     if (!problem || !result) return;
-    const contents = JSON.stringify({ problem, result }, null, 2);
-    const url = URL.createObjectURL(
-      new Blob([contents], { type: "application/json" }),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "atlas-plan.json";
-    a.click();
-    URL.revokeObjectURL(url);
+    if (format === "json") {
+      const contents = JSON.stringify({ problem, result }, null, 2);
+      const url = URL.createObjectURL(
+        new Blob([contents], { type: "application/json" }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "atlas-plan.json";
+      a.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+    // XLSX/PDF are rendered by the backend from the exact result on screen.
+    setError("");
+    setBusy(format === "xlsx" ? "正在导出 Excel…" : "正在导出 PDF…");
+    void exportPlanRequest(format, { problem, result })
+      .catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : "导出失败，请重试。"),
+      )
+      .finally(() => setBusy(""));
   }
   const metric = result?.metrics;
   const active =
@@ -347,13 +458,8 @@ export default function App() {
           求解历史
         </button>
         <div className="nav-label scenarios-label">应用场景</div>
-        {(["life", "academic", "lab"] as Scenario[]).map((s) => {
-          const Icon =
-            s === "life"
-              ? CalendarDays
-              : s === "academic"
-                ? GraduationCap
-                : FlaskConical;
+        {(Object.keys(SCENARIOS) as Scenario[]).map((s) => {
+          const Icon = SCENARIO_ICONS[s];
           return (
             <button
               disabled={!!busy}
@@ -423,6 +529,24 @@ export default function App() {
           </div>
         </header>
         <main className="main-content">
+          <div className="scenario-chips" role="tablist" aria-label="应用场景">
+            {(Object.keys(SCENARIOS) as Scenario[]).map((s) => {
+              const Icon = SCENARIO_ICONS[s];
+              return (
+                <button
+                  key={s}
+                  role="tab"
+                  aria-selected={scenario === s}
+                  disabled={!!busy}
+                  className={`scenario-chip ${scenario === s ? "active" : ""}`}
+                  onClick={() => void load(s)}
+                >
+                  <Icon size={14} />
+                  {SCENARIOS[s].title}
+                </button>
+              );
+            })}
+          </div>
           <section className="page-heading">
             <div>
               <div className="eyebrow">
@@ -505,6 +629,7 @@ export default function App() {
                       setWarnings([]);
                       setPage("workspace");
                       setMode("balanced");
+                      setCustomWeights(h.result.objective?.weights ?? null);
                     }}
                   >
                     <span className="history-icon">
@@ -604,8 +729,12 @@ export default function App() {
                   setConstraintEditor={setConstraintEditor}
                   deleteConstraint={deleteConstraint}
                   deleteActivity={deleteActivity}
+                  editActivity={setEditingActivity}
                   mode={mode}
                   setMode={setMode}
+                  weightsMeta={weightsMeta}
+                  customWeights={customWeights}
+                  setCustomWeights={setCustomWeights}
                   setHelp={setHelp}
                   reviewed={reviewed}
                   setReviewed={setReviewed}
@@ -613,6 +742,8 @@ export default function App() {
                   previous={previous}
                   fileRef={fileRef}
                   importFile={importFile}
+                  textFileRef={textFileRef}
+                  importText={importText}
                 />
                 <ResultPanel
                   problem={problem}
@@ -677,22 +808,37 @@ export default function App() {
           }}
         />
       )}
-      {problem && addingActivity && (
+      {problem && (addingActivity || editingActivity) && (
         <ActivityEditor
           problem={problem}
-          onClose={() => setAddingActivity(false)}
+          initial={editingActivity ?? undefined}
+          onClose={() => {
+            setAddingActivity(false);
+            setEditingActivity(null);
+          }}
           onSave={async (a, c) => {
             try {
+              const activities = editingActivity
+                ? problem.activities.map((x) => (x.id === a.id ? a : x))
+                : [...problem.activities, a];
+              const constraints = editingActivity
+                ? problem.constraints.filter(
+                    (x) =>
+                      !(
+                        x.type === "fixed_time" &&
+                        x.target === editingActivity.id
+                      ),
+                  )
+                : problem.constraints;
               const p = {
                 ...problem,
-                activities: [...problem.activities, a],
-                constraints: c
-                  ? [...problem.constraints, c]
-                  : problem.constraints,
+                activities,
+                constraints: c ? [...constraints, c] : constraints,
               };
               await api("/constraints/validate", p);
               draft(p);
               setAddingActivity(false);
+              setEditingActivity(null);
               setInputTab("activities");
             } catch (e) {
               setError((e as Error).message);
@@ -717,45 +863,81 @@ export default function App() {
               {active.optional ? "可选活动" : "必须完成"}
             </p>
             <h4>
-              <ShieldCheck size={16} />
-              安排校验依据
+              <Sparkles size={16} />
+              为什么排在这个时间？
             </h4>
-            <ul>
-              <li>在该活动允许的日期与时间域内。</li>
-              <li>占用资源均未超过可用并发容量。</li>
-              {active.resources.map((r) => (
-                <li key={r}>
-                  使用资源：{problem.resources.find((x) => x.id === r)?.name}
-                </li>
-              ))}
-              {selected.room_id && (
-                <li>
-                  教室：
-                  {
-                    problem.resources.find((x) => x.id === selected.room_id)
-                      ?.name
-                  }
-                  ，已检查类型和座位容量。
-                </li>
-              )}
-              {problem.constraints
-                .filter((c) =>
-                  [
-                    active.id,
-                    active.category,
-                    ...active.resources,
-                    "*",
-                  ].includes(c.target),
-                )
-                .map((c) => (
-                  <li key={c.id}>
-                    {c.label}
-                    {c.level === "soft" ? "（优化偏好）" : "（硬约束已通过）"}
+            {explanation?.narrative && (
+              <div className="narrative">
+                <p>{explanation.narrative.headline}</p>
+                {explanation.narrative.bullets.length > 0 && (
+                  <ul>
+                    {explanation.narrative.bullets.map((b, i) => (
+                      <li key={i}>{b}</li>
+                    ))}
+                  </ul>
+                )}
+                <small>由 LLM 依据本次求解事实生成</small>
+              </div>
+            )}
+            {explanation ? (
+              <div className="why-list">
+                {explanation.reasons.map((reason, index) => (
+                  <article
+                    className={`why-item why-${reason.kind}`}
+                    key={`${reason.kind}-${index}`}
+                  >
+                    <strong>{reason.title}</strong>
+                    <p>{reason.detail}</p>
+                  </article>
+                ))}
+              </div>
+            ) : explainBusy ? (
+              <p className="why-loading">
+                <Loader2 size={15} className="spin" />
+                正在根据本次求解数据生成解释…
+              </p>
+            ) : (
+              <ul>
+                <li>在该活动允许的日期与时间域内。</li>
+                <li>占用资源均未超过可用并发容量。</li>
+                {active.resources.map((r) => (
+                  <li key={r}>
+                    使用资源：{problem.resources.find((x) => x.id === r)?.name}
                   </li>
                 ))}
-            </ul>
+                {selected.room_id && (
+                  <li>
+                    教室：
+                    {
+                      problem.resources.find((x) => x.id === selected.room_id)
+                        ?.name
+                    }
+                    ，已检查类型和座位容量。
+                  </li>
+                )}
+                {problem.constraints
+                  .filter((c) =>
+                    [
+                      active.id,
+                      active.category,
+                      ...active.resources,
+                      "*",
+                    ].includes(c.target),
+                  )
+                  .map((c) => (
+                    <li key={c.id}>
+                      {c.label}
+                      {c.level === "soft"
+                        ? "（优化偏好）"
+                        : "（硬约束已通过）"}
+                    </li>
+                  ))}
+              </ul>
+            )}
             <div className="form-note">
-              这是依据求解数据生成的校验说明，不代表该时间是唯一可行选择。
+              {explanation
+                ? `单项活动时间筛选得到 ${explanation.candidate_slots_total} 个候选开始时段，未逐项验证其他活动的资源占用及先后关系。当前方案已经求解并独立校验。`
+                : "这是依据求解数据生成的校验说明，不代表该时间是唯一可行选择。"}
             </div>
           </div>
         </Dialog>
@@ -766,7 +948,7 @@ export default function App() {
             <ol>
               <li>
                 <strong>选择一个场景</strong>
-                <p>加载真实示例，三个场景共用一个 CP-SAT 求解内核。</p>
+                <p>加载真实示例，多个场景共用一个 CP-SAT 求解内核。</p>
               </li>
               <li>
                 <strong>描述安排或导入文件</strong>

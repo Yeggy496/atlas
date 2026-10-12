@@ -1,4 +1,4 @@
-# Deployment template only; no cloud service has been created.
+# Render deployment configuration for the existing ATLAS service.
 # Commit frontend/dist together with source before deploying this small demo.
 services:
   - type: web
@@ -6,7 +6,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r backend/requirements-lock.txt && python run_demo.py --check
-  startCommand: ATLAS_SOLVE_SECONDS=30 ATLAS_SOLVER_WORKERS=1 ATLAS_DIAGNOSIS_SECONDS=2 uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    startCommand: ATLAS_SOLVE_SECONDS=30 ATLAS_SOLVER_WORKERS=1 ATLAS_DIAGNOSIS_SECONDS=2 uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
@@ -15,3 +15,14 @@ services:
         value: demo
       - key: ATLAS_DB_PATH
         value: /tmp/atlas.db
+
+      # Optional real-model settings. Keep LLM_PROVIDER=demo for the public demo,
+      # then uncomment and fill these in the Render dashboard (never commit a key):
+      # - key: OPENAI_API_KEY
+      #   sync: false
+      # - key: OPENAI_MODEL
+      #   value: gpt-4.1-mini
+      # - key: OPENAI_BASE_URL
+      #   sync: false
+      # - key: OPENAI_TIMEOUT
+      #   value: "300"

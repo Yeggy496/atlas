@@ -355,6 +355,18 @@ button:not(:disabled):active {
   background: #f0f3f9;
   color: #365bd6;
 }
+.export-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #e3e8f0;
+  border-radius: 7px;
+  background: #fbfcfe;
+}
+.export-group .icon-button:hover:not(:disabled) {
+  background: #eaeffa;
+}
 .main-content {
   padding: 28px 32px 16px;
   max-width: 1640px;

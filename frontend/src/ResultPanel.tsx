@@ -2,6 +2,8 @@ import {
   CalendarDays,
   Activity as ActivityIcon,
   Download,
+  FileSpreadsheet,
+  FileText,
   Loader2,
   CheckCircle2,
   AlertTriangle,
@@ -21,7 +23,7 @@ interface Props {
   view: "calendar" | "resources";
   setView: (v: "calendar" | "resources") => void;
   summary: string[];
-  exportPlan: () => void;
+  exportPlan: (format: "json" | "xlsx" | "pdf") => void;
   repair: (id: string) => Promise<void>;
   setSelected: (v: Assignment | null) => void;
 }
@@ -38,7 +40,15 @@ const PENALTIES: Record<string, { label: string; description: string }> = {
     label: "负载均衡",
     description: "每日非睡眠任务量偏离周平均的绝对差",
   },
-  robust: { label: "截止缓冲", description: "距离截止不足两小时的惩罚" },
+  robust: { label: "截止缓冲", description: "未给截止任务留足缓冲的惩罚" },
+  lead: {
+    label: "提前完成",
+    description: "截止任务的开始时刻；仅在稳健档启用，越低表示越早完成",
+  },
+  regular: {
+    label: "作息规律",
+    description: "同名日常活动（如午餐、晚餐）每天时间不一致的程度",
+  },
   stability: {
     label: "方案稳定",
     description: "已有任务的时间或教室发生变动的数量",
@@ -99,19 +109,39 @@ export function ResultPanel({
               <span>资源</span>
             </button>
           </div>
-          <button
-            title="下载当前计划 JSON"
-            aria-label="下载计划"
-            className="icon-button"
-            disabled={!result?.assignments.length}
-            onClick={exportPlan}
-          >
-            <Download size={17} />
-          </button>
+          <div className="export-group" role="group" aria-label="导出方案">
+            <button
+              title="导出 Excel（含完整中文课表）"
+              aria-label="导出 Excel"
+              className="icon-button"
+              disabled={!result?.assignments.length}
+              onClick={() => exportPlan("xlsx")}
+            >
+              <FileSpreadsheet size={17} />
+            </button>
+            <button
+              title="导出 PDF（英文摘要版，中文请用 Excel）"
+              aria-label="导出 PDF"
+              className="icon-button"
+              disabled={!result?.assignments.length}
+              onClick={() => exportPlan("pdf")}
+            >
+              <FileText size={17} />
+            </button>
+            <button
+              title="下载当前计划 JSON"
+              aria-label="下载计划 JSON"
+              className="icon-button"
+              disabled={!result?.assignments.length}
+              onClick={() => exportPlan("json")}
+            >
+              <Download size={17} />
+            </button>
+          </div>
         </div>
       </div>
       <div
-        className={`solver-strip ${result?.status === "INFEASIBLE" ? "infeasible" : ""}`}
+        className={`solver-strip ${["INFEASIBLE", "UNKNOWN"].includes(result?.status ?? "") ? "infeasible" : ""}`}
       >
         <div>
           {busy ? (
@@ -134,14 +164,22 @@ export function ResultPanel({
           {result ? `${metric?.solve_time}s · CP-SAT` : "确认约束后开始优化"}
         </span>
       </div>
-      {result?.status === "INFEASIBLE" ? (
+      {result && ["INFEASIBLE", "UNKNOWN"].includes(result.status) ? (
         <div className="conflict-view">
           <div className="conflict-illustration">
             <Workflow size={40} />
             <span>!</span>
           </div>
-          <h2>有些要求，暂时无法同时满足。</h2>
-          <p>求解器已证明当前模型无解。你可以选择放宽一条限制，再重新优化。</p>
+          <h2>
+            {result.status === "INFEASIBLE"
+              ? "有些要求，暂时无法同时满足。"
+              : "本次求解在时限内没有得出可行解。"}
+          </h2>
+          <p>
+            {result.status === "INFEASIBLE"
+              ? "求解器已证明当前模型无解。你可以选择放宽一条限制，再重新优化。"
+              : "这通常是任务规模较大或约束较紧导致超时，并不代表问题一定无解。下面给出经重求解验证的排查方向。"}
+          </p>
           {result.conflicts.map((c, i) => (
             <article className="conflict-item" key={i}>
               <AlertTriangle size={17} />

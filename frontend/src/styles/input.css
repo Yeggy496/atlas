@@ -264,6 +264,124 @@
   color: #98a4b7;
   margin: 9px 0 14px;
 }
+.mode-hint {
+  display: block;
+  margin-top: 3px;
+  color: #aab4c5;
+}
+/* Custom objective weights (MASTER_SPEC §15) */
+.weight-panel {
+  border: 1px solid #e9edf4;
+  border-radius: 6px;
+  background: #fbfcfe;
+  padding: 8px 10px 10px;
+  margin: 0 0 14px;
+}
+.weight-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #54627c;
+}
+.weight-reset {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 9px;
+  color: #8e9ab0;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.weight-reset:hover {
+  color: #486bd0;
+  background: #eef2fb;
+}
+.weight-empty {
+  font-size: 9px;
+  color: #aab4c5;
+  margin: 8px 0 2px;
+}
+.weight-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 9px 0 8px;
+}
+.weight-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 24px;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+.weight-label {
+  font-size: 9px;
+  color: #7e8ca3;
+  white-space: nowrap;
+}
+.weight-value {
+  font-size: 9px;
+  color: #486bd0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.weight-row input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: #dde4f1;
+  outline: none;
+}
+.weight-row input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #486bd0;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px #21315a33;
+  cursor: pointer;
+}
+.weight-row input[type="range"]::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #486bd0;
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px #21315a33;
+  cursor: pointer;
+}
+.weight-row input[type="range"]:disabled {
+  opacity: 0.5;
+}
+.weight-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.weight-hint {
+  font-size: 8px;
+  color: #aab4c5;
+  flex: 1;
+}
+.weight-apply {
+  font-size: 9px;
+  color: #fff;
+  background: #486bd0;
+  border-radius: 4px;
+  padding: 4px 9px;
+  white-space: nowrap;
+}
+.weight-apply:disabled {
+  background: #c4cee1;
+  cursor: not-allowed;
+}
 .review-check {
   display: flex;
   align-items: center;

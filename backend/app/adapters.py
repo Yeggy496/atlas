@@ -45,7 +45,8 @@ def academic():
     constraints += [rule('zhangfriday', '张老师周五下午不可用', 'unavailable', 'zhang', day=4, start=24, end=48),
                     rule('classlunch', '全班 12:00–14:00 午休', 'unavailable', 'class', start=24, end=28),
                     rule('classdaily', '每天最多安排 3 个教学活动', 'daily_limit', '*', value=3),
-                    rule('morningpref', '课程尽量安排在上午', 'preferred_window', 'course', level='soft', start=16, end=24)]
+                    rule('morningpref', '课程尽量安排在上午', 'preferred_window', 'course', level='soft', start=16, end=24),
+                    rule('mlconsec', '机器学习 1 与 机器学习 2 连排', 'consecutive', 'ml0', other='ml1')]
     return Problem(scenario='academic', name='计算机 2401 班课表', resources=resources, activities=activities, constraints=constraints)
 
 
@@ -65,4 +66,64 @@ def lab():
     return Problem(scenario='lab', name='实验室本周安排', resources=resources, activities=activities, constraints=constraints)
 
 
-ADAPTERS = {'life': life, 'academic': academic, 'lab': lab}
+
+def meeting():
+    """会议/会议室预订：把会议、参会人与共享会议室排到互不冲突的时段。
+
+    与个人日程、排课都不同：这里调度的对象是"预订"，核心冲突是
+    共享会议室的容量（人数/是否视频）与参会人（组织者）的时间。
+    """
+    resources = [Resource(id='room_s', name='小会议室 · 8 人', type='room', seats=8, room_type='meeting'),
+                 Resource(id='room_m', name='中会议室 · 20 人', type='room', seats=20, room_type='meeting'),
+                 Resource(id='room_v', name='视频会议室 · 12 人', type='room', seats=12, room_type='video'),
+                 Resource(id='alice', name='张经理', type='person'),
+                 Resource(id='bob', name='李工', type='person')]
+    rooms = ['room_s', 'room_m', 'room_v']
+    activities = []
+    for aid, name, dur, seats, rtype, owner, days, ws, we in [
+        ('weekly', '部门周例会', 2, 8, '', 'alice', [0], 16, 24),
+        ('review', '产品评审会', 4, 12, '', 'alice', [1, 2, 3], 16, 36),
+        ('demo', '客户视频演示', 4, 10, 'video', 'bob', [2, 3, 4], 16, 36),
+        ('sharing', '技术分享', 4, 18, '', 'bob', [1, 2], 16, 36),
+        ('interview', '新人面试', 2, 4, '', 'alice', [1, 2, 3], 18, 34),
+        ('sync', '跨组同步会', 2, 6, '', 'bob', [0, 1, 2, 3, 4], 16, 36)]:
+        activities.append(Activity(id=aid, name=name, duration=dur, category='meeting', resources=[owner],
+                                   room_options=rooms, required_seats=seats, room_type=rtype,
+                                   days=days, window_start=ws, window_end=we))
+    constraints = [rule('weeklyfixed', '部门周例会 · 周一 10:00', 'fixed_time', 'weekly', day=0, start=20),
+                   rule('nobook', '12:00–13:00 不安排会议', 'unavailable', 'meeting', start=24, end=26),
+                   rule('morning', '会议尽量安排在上午', 'preferred_window', 'meeting', level='soft', start=16, end=24),
+                   rule('cap', '每天最多 3 场会议', 'daily_limit', '*', value=3)]
+    return Problem(scenario='meeting', name='本周会议室预订', resources=resources, activities=activities, constraints=constraints)
+
+
+def production():
+    """生产排程：带多道工序的工单排到共享机台。
+
+    每个工单由 group/op_index 串成"切削加工 -> 装配 -> 质检"的工序链，
+    切削工序可在两台数控机床中任选一台——这是纯个人日程无法表达的模型。
+    """
+    resources = [Resource(id='mill1', name='数控机床 1 号', type='machine'),
+                 Resource(id='mill2', name='数控机床 2 号', type='machine'),
+                 Resource(id='assembly', name='装配工位', type='machine'),
+                 Resource(id='inspect', name='质检工位', type='machine')]
+    mills = ['mill1', 'mill2']
+    activities, constraints = [], []
+    for job, label, cut, asm, qc, due in [
+        ('jobA', '工单 A · 轴承座', 4, 2, 2, 96),
+        ('jobB', '工单 B · 连接件', 2, 2, 2, 120),
+        ('jobC', '工单 C · 法兰盘', 4, 4, 2, 144)]:
+        days = [0, 1, 2, 3, 4]
+        activities += [
+            Activity(id=f'{job}_cut', name=f'{label} · 切削加工', duration=cut, category='operation', resources=[],
+                     room_options=mills, group=job, op_index=0, days=days, window_start=16, window_end=44),
+            Activity(id=f'{job}_asm', name=f'{label} · 装配', duration=asm, category='operation', resources=['assembly'],
+                     group=job, op_index=1, days=days, window_start=16, window_end=44),
+            Activity(id=f'{job}_qc', name=f'{label} · 质检', duration=qc, category='operation', resources=['inspect'],
+                     group=job, op_index=2, days=days, window_start=16, window_end=44)]
+        constraints.append(rule(f'due_{job}', f'{label} · 需在第 {due // 48 + 1} 天结束前完工', 'deadline', f'{job}_qc', end=due))
+    constraints.append(rule('workpref', '工序尽量安排在白天 08:00–18:00', 'preferred_window', 'operation', level='soft', start=16, end=36))
+    return Problem(scenario='production', name='本周生产工单排程', resources=resources, activities=activities, constraints=constraints)
+
+
+ADAPTERS = {'life': life, 'academic': academic, 'lab': lab, 'meeting': meeting, 'production': production}

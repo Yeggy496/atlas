@@ -2,8 +2,13 @@
 
 Live demo: https://atlas-ptbu.onrender.com
 
-A small scheduling demo for personal weekly planning, one-class academic timetabling, and laboratory resources.
-All three scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
+A small scheduling application for personal weekly planning, one-class academic timetabling,
+laboratory resources, meeting rooms, and production jobs.
+All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
+
+Latest verified capability report: [2026-10-12 review](docs/REVIEW_2026-10-12.md).
+The default provider remains `demo`; real model calls require server-side configuration.
+The report distinguishes working website features from backend-only capabilities and remaining limitations.
 
 ## Run
 
@@ -16,9 +21,20 @@ pip install -r backend/requirements-lock.txt
 python run_demo.py
 ```
 
-The verified frontend production build is included in `frontend/dist` and served by FastAPI.
+The verified frontend production build is included in `frontend/dist` and served by FastAPI, so the
+committed bundle is what the live demo ships.
 For frontend development, run `pnpm install --frozen-lockfile` and `pnpm dev` in `frontend`.
-After editing frontend code, run `pnpm build` and commit the updated build.
+After editing frontend code, rebuild and commit the bundle in one step:
+
+```sh
+scripts/build_frontend.ps1   # pnpm install --frozen-lockfile && pnpm build, then git add frontend/dist
+```
+
+Enable the tracked guard once per clone so a frontend change cannot be committed without the rebuilt bundle:
+
+```sh
+git config core.hooksPath .githooks
+```
 
 ## Deploy
 
@@ -38,6 +54,44 @@ Health check: `/api/health`.
 - No accounts or per-user history isolation. Public visitors share demo history; avoid sensitive personal inputs.
 - Free hosting can sleep when idle. SQLite history on ephemeral storage may be lost after restarts or deployments.
 - Repairs relax individual constraints and verify feasibility; they do not prove a globally minimal conflict core.
+
+## LLM provider
+
+`LLM_PROVIDER` selects the constraint parser: `demo` (offline rule parser, no key), `openai`, or `deepseek`.
+The real providers call an OpenAI-compatible `/chat/completions` endpoint and require server-side env vars:
+
+| Variable | Purpose |
+| --- | --- |
+| `LLM_PROVIDER` | `demo` (default), `openai`, or `deepseek` |
+| `OPENAI_API_KEY` / `DEEPSEEK_API_KEY` | provider credential (never commit) |
+| `OPENAI_MODEL` / `DEEPSEEK_MODEL` | model name (defaults `gpt-4.1-mini` / `deepseek-chat`) |
+| `OPENAI_BASE_URL` / `DEEPSEEK_BASE_URL` | optional OpenAI-compatible gateway override (blank = official endpoint) |
+| `OPENAI_TIMEOUT` / `DEEPSEEK_TIMEOUT` | per-request seconds (default `35`; raise for slow gateways) |
+
+`backend/tests/test_llm_live.py` performs a real end-to-end provider call. It is skipped unless
+`ATLAS_LLM_LIVE_TEST=1` and a key are set, so the offline suite and CI stay green without credentials.
+
+### Turning on a real provider on Render
+
+The hosted demo ships with `LLM_PROVIDER=demo` so the public site always works without secrets. To enable a real model:
+
+1. Set `LLM_PROVIDER` to `openai` or `deepseek` in the Render dashboard (or `render.yaml`).
+2. Add the matching `*_API_KEY` as a secret environment variable. Never commit it.
+3. Optionally point `*_BASE_URL` at an OpenAI-compatible gateway and raise `*_TIMEOUT`.
+   For the official DeepSeek endpoint the verified values are `LLM_PROVIDER=deepseek`,
+   `DEEPSEEK_MODEL=deepseek-chat`, and `DEEPSEEK_TIMEOUT=60`.
+4. Prove the server can reach the model before showing the demo:
+
+   `python scripts/check_llm.py --scenario academic`
+
+The check prints the provider, model, base URL, and whether the key is present (never the key itself), and exits non-zero on failure.
+
+*Measured 2026-10 on this project:* the official `https://api.deepseek.com` endpoint with
+`DEEPSEEK_MODEL=deepseek-chat` parses every bundled sample well inside a demo budget
+(lab 5.2 s, life 13.0 s; `POST /api/constraints/parse` returned 200 in 5.0 s).
+A BUPT campus gateway (`deepseek-v4-flash`) answered short requests in 2-9 s, but timed out after
+180-300 s when it had to emit a whole modified problem, so prefer the official endpoint, or another
+fast OpenAI-compatible model, when enabling the real provider on the hosted demo.
 
 ## Tests
 

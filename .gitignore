@@ -1,4 +1,6 @@
 .env
+.env.*
+!.env.example
 .venv/
 node_modules/
 # The small demo commits its verified frontend build for Python-only deployment.
@@ -9,3 +11,8 @@ __pycache__/
 logs/
 .demo.pid
 *.tsbuildinfo
+# Local version snapshots (tools/snapshot.py) and ad-hoc scratch dirs.
+snapshots/
+audit_evidence/
+_scratch*
+_audit*

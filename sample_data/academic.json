@@ -414,6 +414,19 @@
       "other": null,
       "value": 0,
       "source": "template"
+    },
+    {
+      "id": "mlconsec",
+      "label": "机器学习 1 与 机器学习 2 连排",
+      "type": "consecutive",
+      "target": "ml0",
+      "level": "hard",
+      "day": null,
+      "start": 0,
+      "end": 48,
+      "other": "ml1",
+      "value": 0,
+      "source": "template"
     }
   ]
 }

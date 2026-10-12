@@ -4,7 +4,9 @@ import {
   type Problem,
   type Constraint,
   type Activity,
+  CATEGORIES,
   DAYS,
+  clock,
   id,
 } from "./types";
 
@@ -116,6 +118,7 @@ export function ConstraintEditor({
               <option value="deadline">截止时间</option>
               <option value="precedence">前置关系</option>
               <option value="min_gap">最小时间间隔</option>
+              <option value="consecutive">连排（紧接下一活动）</option>
             </select>
           </label>
           <label>
@@ -124,7 +127,9 @@ export function ConstraintEditor({
               value={c.target}
               onChange={(e) => update("target", e.target.value)}
             >
-              {!["fixed_time", "precedence", "min_gap"].includes(c.type) && (
+              {!["fixed_time", "precedence", "min_gap", "consecutive"].includes(
+                c.type,
+              ) && (
                 <>
                   <option value="*">全部活动</option>
                   <optgroup label="资源">
@@ -231,7 +236,7 @@ export function ConstraintEditor({
             </select>
           </label>
         )}
-        {["precedence", "min_gap"].includes(c.type) && (
+        {["precedence", "min_gap", "consecutive"].includes(c.type) && (
           <label>
             后续活动
             <select
@@ -278,59 +283,105 @@ export function ConstraintEditor({
 
 export function ActivityEditor({
   problem,
+  initial,
   onSave,
   onClose,
 }: {
   problem: Problem;
+  initial?: Activity;
   onSave: (a: Activity, c?: Constraint) => void;
   onClose: () => void;
 }) {
-  const [name, setName] = useState("");
-  const [duration, setDuration] = useState(2);
-  const [category, setCategory] = useState("study");
-  const [day, setDay] = useState(-1);
-  const [start, setStart] = useState("19:00");
-  const [fixed, setFixed] = useState(false);
-  const [optional, setOptional] = useState(false);
-  const [resource, setResource] = useState(problem.resources[0]?.id ?? "");
+  const fixedConstraint = initial
+    ? problem.constraints.find(
+        (c) => c.type === "fixed_time" && c.target === initial.id,
+      )
+    : undefined;
+  const initialDay =
+    fixedConstraint?.day ?? (initial?.days.length === 1 ? initial.days[0] : -1);
+  const initialResources = initial?.resources ?? [];
+  const [name, setName] = useState(initial?.name ?? "");
+  const [duration, setDuration] = useState(initial?.duration ?? 2);
+  const [category, setCategory] = useState(initial?.category ?? "study");
+  const [day, setDay] = useState(initialDay);
+  const [start, setStart] = useState(
+    fixedConstraint ? clock(fixedConstraint.start) : "19:00",
+  );
+  const [fixed, setFixed] = useState(Boolean(fixedConstraint));
+  const [optional, setOptional] = useState(initial?.optional ?? false);
+  const [resource, setResource] = useState(
+    initial
+      ? initialResources.length === 1
+        ? initialResources[0]
+        : ""
+      : (problem.resources[0]?.id ?? ""),
+  );
+  const categoryOptions = Array.from(
+    new Set([...Object.keys(CATEGORIES), category]),
+  );
+  const durationOptions = Array.from(
+    new Set([1, 2, 3, 4, 6, 8, 16, duration]),
+  ).sort((a, b) => a - b);
+  const initialDayLabel =
+    initial && initial.days.length > 1 && initial.days.length < 7
+      ? `保留原有日期（共 ${initial.days.length} 天）`
+      : "本周任意一天";
   return (
-    <Dialog title="添加活动" onClose={onClose}>
+    <Dialog title={initial ? "编辑活动" : "添加活动"} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          const aid = id();
+          const aid = initial?.id ?? id();
+          const cleanName = name.trim();
+          const constraintDay = day === -1 ? 2 : day;
+          const [h, m] = start.split(":").map(Number);
           const a: Activity = {
+            ...(initial ?? {
+              id: aid,
+              demands: {},
+              room_options: [],
+              required_seats: 0,
+              room_type: "",
+              priority: 5,
+              group: null,
+              op_index: 0,
+            }),
             id: aid,
-            name,
+            name: cleanName,
             duration,
             category,
-            resources: [resource],
-            demands: {},
-            room_options: [],
-            required_seats: 0,
-            room_type: "",
-            days: day === -1 ? [0, 1, 2, 3, 4, 5, 6] : [day],
-            window_start: fixed ? 0 : 16,
-            window_end: fixed ? 48 : 44,
+            resources:
+              initial && resource === ""
+                ? initial.resources
+                : resource
+                  ? [resource]
+                  : [],
+            days:
+              day === -1
+                ? initial && initial.days.length > 1
+                  ? initial.days
+                  : [0, 1, 2, 3, 4, 5, 6]
+                : [day],
+            window_start: fixed ? 0 : (initial?.window_start ?? 16),
+            window_end: fixed ? 48 : (initial?.window_end ?? 44),
             optional,
-            priority: 5,
           };
-          const [h, m] = start.split(":").map(Number);
           onSave(
             a,
             fixed
               ? {
-                  id: id(),
-                  label: `${name} · ${DAYS[day]} ${start} 固定开始`,
+                  ...(fixedConstraint ?? {}),
+                  id: fixedConstraint?.id ?? id(),
+                  label: `${cleanName} · ${DAYS[constraintDay]} ${start} 固定开始`,
                   type: "fixed_time",
                   target: aid,
                   level: "hard",
-                  day,
-                  start: h * 2 + m / 30,
+                  day: constraintDay,
+                  start: h * 2 + Math.floor(m / 30),
                   end: 48,
                   other: null,
                   value: 0,
-                  source: "manual",
+                  source: fixedConstraint?.source ?? "manual",
                 }
               : undefined,
           );
@@ -354,7 +405,7 @@ export function ActivityEditor({
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value))}
             >
-              {[1, 2, 3, 4, 6, 8, 16].map((x) => (
+              {durationOptions.map((x) => (
                 <option key={x} value={x}>
                   {x / 2} 小时
                 </option>
@@ -367,13 +418,11 @@ export function ActivityEditor({
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
-              <option value="study">学习</option>
-              <option value="homework">作业</option>
-              <option value="meeting">会议</option>
-              <option value="exercise">运动</option>
-              <option value="course">课程</option>
-              <option value="experiment">实验</option>
-              <option value="leisure">自由活动</option>
+              {categoryOptions.map((value) => (
+                <option key={value} value={value}>
+                  {CATEGORIES[value]?.label ?? value}
+                </option>
+              ))}
             </select>
           </label>
         </div>
@@ -383,6 +432,13 @@ export function ActivityEditor({
             value={resource}
             onChange={(e) => setResource(e.target.value)}
           >
+            {initial && (
+              <option value="">
+                {initialResources.length > 1
+                  ? `保留原有资源（共 ${initialResources.length} 项）`
+                  : "无固定资源"}
+              </option>
+            )}
             {problem.resources.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
@@ -393,7 +449,7 @@ export function ActivityEditor({
         <label>
           日期
           <select value={day} onChange={(e) => setDay(Number(e.target.value))}>
-            {!fixed && <option value={-1}>本周任意一天</option>}
+            {!fixed && <option value={-1}>{initialDayLabel}</option>}
             {DAYS.map((d, i) => (
               <option key={d} value={i}>
                 {d}
@@ -433,8 +489,8 @@ export function ActivityEditor({
           可选活动，允许时间不足时不安排
         </label>
         <button type="submit" className="primary wide">
-          <Plus size={16} />
-          添加并检查约束
+          {initial ? <Check size={16} /> : <Plus size={16} />}
+          {initial ? "保存修改" : "添加并检查约束"}
         </button>
       </form>
     </Dialog>

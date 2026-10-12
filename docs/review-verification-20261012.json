@@ -1,0 +1,27 @@
+{
+  "date": "2026-10-12",
+  "version": "0.1.4",
+  "baseline_commit": "4399b9a8a9176115d50016a75fe587e86097c3c7",
+  "pytest": {
+    "passed": 90,
+    "skipped": 1,
+    "seconds": 95.88,
+    "warning": "Starlette TestClient httpx deprecation",
+    "database": "New isolated SQLite database",
+    "live_llm_test": "Skipped intentionally; no live keys used"
+  },
+  "frontend_build": {
+    "typescript": "passed",
+    "vite": "passed",
+    "build_sha256": {
+      "favicon.svg": "1c1214224ecd47997314fb072dd2966f41804dcfe9aa615b23b2ff37cfd55b74",
+      "index.html": "fb2c08548ed53c0984bb7036ceceb2a5a53315f0d74c2566ebf2efdce86ffc1a",
+      "assets/index-D7n9yArD.css": "e8dfa815022773cd4182f583b07cb43a0bde45edf5f130fcdc0e1f4bf9a57ea3",
+      "assets/index-RB_AJfeb.js": "e7e8718529493e382f5080d4447bfe54859bb25fb3eeef6da5ea8ad68c3caf47"
+    }
+  },
+  "render_blueprint": "valid: true from Render CLI",
+  "browser_flows": 13,
+  "desktop_source_preserved": true,
+  "scope": "Local functional verification; not concurrency or largest-input certification"
+}

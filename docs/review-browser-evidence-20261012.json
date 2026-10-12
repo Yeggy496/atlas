@@ -1,0 +1,75 @@
+{
+  "url": "http://127.0.0.1:8014",
+  "provider": "demo",
+  "checks": [
+    "Personal template: real CP-SAT schedule and independent validation",
+    "TXT import -> parsing -> mandatory review -> meeting in real schedule",
+    "Custom weights applied and reset: submitted values match solver weights",
+    "Resource view and backend-derived activity explanation",
+    "Excel, PDF and JSON downloads contain the displayed real result",
+    "History restoration displays saved schedule and objective weights",
+    "academic: real template solve with zero independently checked hard violations",
+    "lab: real template solve with zero independently checked hard violations",
+    "meeting: real template solve with zero independently checked hard violations",
+    "production: real template solve with zero independently checked hard violations",
+    "Deleting a production job removes every step and related constraints",
+    "Proven conflict -> verified repair candidate -> real feasible repaired plan",
+    "Desktop and 390px mobile layout render with usable scenario navigation"
+  ],
+  "scenarios": {
+    "life": {
+      "activities": 35,
+      "resources": 1,
+      "constraints": 11,
+      "status": "FEASIBLE",
+      "solve_seconds": 4.014,
+      "hard_violations": 0,
+      "variables": 1676
+    },
+    "academic": {
+      "activities": 11,
+      "resources": 6,
+      "constraints": 5,
+      "status": "FEASIBLE",
+      "solve_seconds": 4.01,
+      "hard_violations": 0,
+      "variables": 829
+    },
+    "lab": {
+      "activities": 6,
+      "resources": 6,
+      "constraints": 4,
+      "status": "OPTIMAL",
+      "solve_seconds": 1.225,
+      "hard_violations": 0,
+      "variables": 663
+    },
+    "meeting": {
+      "activities": 6,
+      "resources": 5,
+      "constraints": 4,
+      "status": "OPTIMAL",
+      "solve_seconds": 0.471,
+      "hard_violations": 0,
+      "variables": 558
+    },
+    "production": {
+      "activities": 9,
+      "resources": 4,
+      "constraints": 4,
+      "status": "OPTIMAL",
+      "solve_seconds": 0.581,
+      "hard_violations": 0,
+      "variables": 1447
+    }
+  },
+  "page_errors": [],
+  "console_errors": [],
+  "downloads_bytes": {
+    "xlsx": 8721,
+    "pdf": 5042,
+    "json": 26921
+  },
+  "date": "2026-10-12",
+  "scope": "Local smoke check, 4-second solver limit; not a load or live-LLM test"
+}

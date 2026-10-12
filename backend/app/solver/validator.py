@@ -45,8 +45,19 @@ def verify(problem: Problem, assignments: list[Assignment]):
                 bad = local < c.end and local+a.duration > c.start
             elif c.type in ('precedence', 'min_gap') and c.other in chosen:
                 bad = x.end + (c.value if c.type == 'min_gap' else 0) > chosen[c.other].start
+            elif c.type == 'consecutive' and c.other in chosen:
+                bad = chosen[c.other].start != x.end
             if bad:
                 errors.append(c.label)
+    groups = defaultdict(list)
+    for a in problem.activities:
+        if a.group:
+            groups[a.group].append(a)
+    for members in groups.values():
+        members.sort(key=lambda a: a.op_index)
+        for prev, nxt in zip(members, members[1:]):
+            if prev.id in chosen and nxt.id in chosen and chosen[prev.id].end > chosen[nxt.id].start:
+                errors.append(f'工序顺序错误：{prev.name} 应先于 {nxt.name} 完成')
     for (rid, _), demand in occupancy.items():
         if demand > resources[rid].capacity:
             errors.append(f'{resources[rid].name} 容量超限')

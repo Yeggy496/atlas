@@ -51,7 +51,13 @@ export function Calendar({
         </span>
         <span>
           <span className="dot teal" />
-          {problem.scenario === "life" ? "作业" : "实验"}
+          {problem.scenario === "life"
+            ? "作业"
+            : problem.scenario === "meeting"
+              ? "会议"
+              : problem.scenario === "production"
+                ? "工序"
+                : "实验"}
         </span>
         <span>
           <span className="dot orange" />
