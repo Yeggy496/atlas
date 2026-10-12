@@ -31,7 +31,7 @@ def parse_integer(value, label):
 
 
 def import_table(problem:Problem, filename:str, content:bytes):
-    if len(content)>2_000_000: raise ValueError('演示版文件最大为 2 MB。')
+    if len(content)>2_000_000: raise ValueError('上传文件最大为 2 MB。')
     if filename.lower().endswith('.csv'):
         try: raw=content.decode('utf-8-sig')
         except UnicodeDecodeError: raw=content.decode('gb18030')
@@ -46,7 +46,7 @@ def import_table(problem:Problem, filename:str, content:bytes):
             headers=[str(x).strip() for x in first]
             rows=[dict(zip(headers,line)) for line in iterator if any(v is not None for v in line)]
         finally: book.close()
-    else: raise ValueError('此 Demo 支持 CSV 和 XLSX 模板。')
+    else: raise ValueError('任务表支持 CSV 和 XLSX 模板。')
     if not rows or len(rows)>100: raise ValueError('文件须包含 1–100 行活动。')
     p=problem.model_copy(deep=True)
     resource_ids={r.id for r in p.resources}
@@ -93,7 +93,7 @@ def extract_text(filename: str, content: bytes) -> dict:
     tasks or constraints — that is the job of the reviewed NL pipeline.
     """
     if len(content) > 2_000_000:
-        raise ValueError('演示版文件最大为 2 MB。')
+        raise ValueError('上传文件最大为 2 MB。')
     name = filename.lower()
     if name.endswith(TEXT_SUFFIXES):
         text = _decode_text(content)

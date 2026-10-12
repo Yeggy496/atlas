@@ -62,7 +62,7 @@ class Constraint(BaseModel):
         if self.type == 'preferred_window' and self.level != 'soft':
             raise ValueError('时间偏好必须是软约束。')
         if self.type != 'preferred_window' and self.level == 'soft':
-            raise ValueError('此 Demo 仅将时间偏好编译为软约束。')
+            raise ValueError('当前仅支持将时间偏好设为软约束。')
         if self.type in ('time_window', 'unavailable', 'preferred_window'):
             if not (0 <= self.start < self.end <= 48):
                 raise ValueError('时间窗口必须在一天内且起点早于终点。')

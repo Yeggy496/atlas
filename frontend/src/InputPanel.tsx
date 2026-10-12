@@ -124,7 +124,7 @@ export function InputPanel({
           <p>需求从这里开始</p>
         </div>
         <span className="ai-tag">
-          {provider === "demo" ? "离线演示" : provider === "deepseek" ? "DeepSeek" : "OpenAI"}
+          {provider === "demo" ? "规则解析" : provider === "deepseek" ? "DeepSeek" : "OpenAI"}
         </span>
       </div>
       <div className="nl-input">
@@ -139,7 +139,7 @@ export function InputPanel({
         <div>
           <span>
             <Sparkles size={12} />
-            {provider === "demo" ? "支持示例句式" : "结构化约束解析"}
+            {provider === "demo" ? "按规则识别需求" : "AI 识别任务与约束"}
           </span>
           <button
             className="parse-button"
@@ -254,7 +254,7 @@ export function InputPanel({
                     {c.level === "hard" ? "硬约束" : "软偏好"}
                     <span>·</span>
                     {c.source === "template"
-                      ? "示例"
+                      ? "预置"
                       : c.source === "file"
                         ? "文件导入"
                         : "用户输入"}

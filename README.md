@@ -1,12 +1,13 @@
 # ATLAS-Σ
 
-Live demo: https://atlas-ptbu.onrender.com
+Website: https://atlas-ptbu.onrender.com
 
 A small scheduling application for personal weekly planning, one-class academic timetabling,
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Current small update: [v0.1.5 notes and DeepSeek setup](docs/RELEASE_0.1.5.md).
+Current update: [v0.1.6 product interface notes](docs/RELEASE_0.1.6.md).
+DeepSeek setup and connection verification: [v0.1.5 notes](docs/RELEASE_0.1.5.md).
 Verified capability report before this update: [2026-10-12 review](docs/REVIEW_2026-10-12.md).
 The default provider remains `demo`; real model calls require server-side configuration.
 The existing Render website was configured with the official DeepSeek provider and verified on

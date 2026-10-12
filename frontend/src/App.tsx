@@ -9,7 +9,6 @@ import {
   CalendarDays,
   Check,
   CheckCheck,
-  ChevronDown,
   ChevronRight,
   CircleHelp,
   Clock3,
@@ -112,7 +111,7 @@ export default function App() {
 
   async function load(s: Scenario) {
     const version = ++loadCounter.current;
-    setBusy("正在求解示例");
+    setBusy("正在生成预置方案");
     setError("");
     setNotice("");
     setResult(null);
@@ -315,24 +314,6 @@ export default function App() {
       if (textFileRef.current) textFileRef.current.value = "";
     }
   }
-  async function conflict() {
-    if (!problem) return;
-    setBusy("正在建立冲突样例");
-    setError("");
-    try {
-      const p = await api<Problem>("/demo/conflict", problem);
-      draft(p);
-      setSummary([
-        "已加入两个占用同一资源、同一时间的活动限制。请确认后求解，查看真实冲突诊断。",
-      ]);
-      setWarnings([]);
-      setInputTab("constraints");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy("");
-    }
-  }
   async function repair(constraint_id: string) {
     if (!problem) return;
     setBusy("正在验证并应用修复");
@@ -440,10 +421,7 @@ export default function App() {
         </a>
         <div className="workspace-label">
           <span className="workspace-avatar">A</span>
-          <div>
-            我的工作空间<small>比赛演示版</small>
-          </div>
-          <ChevronDown size={14} />
+          <div>我的工作空间</div>
         </div>
         <div className="nav-label">工作空间</div>
         <button
@@ -481,11 +459,11 @@ export default function App() {
         })}
         <div className="sidebar-note">
           <Workflow size={22} />
-          <strong>一个引擎，多种可能。</strong>
+          <strong>安排任务，协调资源。</strong>
           <p>
-            需求理解 · 约束建模
+            生成计划 · 识别冲突
             <br />
-            组合优化 · 冲突修复
+            调整安排 · 查看资源
           </p>
           <div className="mini-flow">
             <span />
@@ -524,7 +502,7 @@ export default function App() {
               <span />
               CP-SAT 引擎
             </span>
-            <span className="demo-badge">{provider === "demo" ? "DEMO" : provider.toUpperCase()}</span>
+            <span className="provider-badge">{provider === "demo" ? "规则解析" : provider === "deepseek" ? "DeepSeek" : "OpenAI"}</span>
             <button
               className="icon-button"
               aria-label="使用指南"
@@ -561,12 +539,12 @@ export default function App() {
                   : `${title.en} / 调度工作台`}
               </div>
               <h1>
-                {page === "history" ? "每一次优化，都有迹可循。" : title.title}
+                {page === "history" ? "求解历史" : title.title}
                 <span className="heading-dot" />
               </h1>
               <p>
                 {page === "history"
-                  ? "查看真实求解记录，恢复任务、约束与结果。"
+                  ? "查看历史计划，恢复任务、约束与安排。"
                   : title.description}
               </p>
             </div>
@@ -577,7 +555,7 @@ export default function App() {
                 onClick={() => void load(scenario)}
               >
                 <RotateCcw size={15} />
-                恢复示例
+                恢复预置方案
               </button>
               <button
                 className="primary"
@@ -765,25 +743,14 @@ export default function App() {
               </div>
               <footer className="workspace-footer">
                 <span>
-                  <Workflow size={14} />
-                  Understand <ChevronRight size={12} />
-                  Model <ChevronRight size={12} />
-                  Optimize <ChevronRight size={12} />
-                  Explain <ChevronRight size={12} />
-                  Repair
+                  <Clock3 size={14} />
+                  时间精度：30 分钟
                 </span>
                 <button
-                  disabled={
-                    !!busy ||
-                    !problem?.activities.length ||
-                    problem.constraints.some((c) =>
-                      c.id.startsWith("demo_conflict"),
-                    )
-                  }
-                  onClick={conflict}
+                  onClick={() => setHelp(true)}
                 >
-                  <FlaskConical size={14} />
-                  试试冲突诊断
+                  <CircleHelp size={14} />
+                  使用指南
                   <ArrowUpRight size={13} />
                 </button>
               </footer>
@@ -882,7 +849,7 @@ export default function App() {
                     ))}
                   </ul>
                 )}
-                <small>由 LLM 依据本次求解事实生成</small>
+                <small>AI 根据约束与求解结果生成说明</small>
               </div>
             )}
             {explanation ? (
@@ -954,13 +921,13 @@ export default function App() {
             <ol>
               <li>
                 <strong>选择一个场景</strong>
-                <p>加载真实示例，多个场景共用一个 CP-SAT 求解内核。</p>
+                <p>选择需要安排的场景，从预置方案开始，或导入自己的任务与资源。</p>
               </li>
               <li>
                 <strong>描述安排或导入文件</strong>
                 <p>
-                  识别结果会成为任务与约束。离线模式支持示例句式；完整 LLM
-                  解析需要服务端配置 OpenAI 或 DeepSeek。
+                  输入需求后点击“识别约束”。CSV/XLSX 可导入任务；TXT/PDF 提取文字后，再进行识别。
+                  {provider === "demo" && "当前使用规则解析，无法识别的要求可手工补充。"}
                 </p>
               </li>
               <li>
@@ -978,14 +945,12 @@ export default function App() {
               <li>
                 <strong>处理冲突</strong>
                 <p>
-                  点击“试试冲突诊断”，确认后求解。修复候选经过实际求解验证，点击后才会放宽限制。
+                  要求无法同时满足时，系统会显示冲突信息。可修改约束，或选择经过求解验证的修复建议后重新生成计划。
                 </p>
               </li>
             </ol>
             <div className="form-note">
-              示例周：2026 年 10 月 12–18 日。30 分钟粒度；个人睡眠示例固定从
-              00:00 开始；排课示例按每课时 60
-              分钟建模。优化明细显示实际惩罚值，未转换成虚构的百分制评分。
+              时间精度为 30 分钟。个人计划的预置睡眠从 00:00 开始；排课预置方案按每课时 60 分钟安排。可在任务与约束中修改。优化明细显示各目标的惩罚值，数值越低代表对应目标的偏离越少。
             </div>
           </div>
         </Dialog>

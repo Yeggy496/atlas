@@ -336,7 +336,7 @@ button:not(:disabled):active {
   border-radius: 50%;
   box-shadow: 0 0 0 3px #4fa38811;
 }
-.demo-badge {
+.provider-badge {
   font-size: 9px;
   letter-spacing: 1px;
   font-weight: 650;

@@ -15,7 +15,7 @@ class ErrorBoundary extends React.Component<
     return this.state.error ? (
       <main className="crash">
         <h1>页面遇到了一点问题</h1>
-        <p>请刷新页面重新载入示例，已保存的求解历史仍在服务端。</p>
+        <p>请刷新页面重新载入工作台，再从求解历史恢复计划。</p>
         <button onClick={() => location.reload()}>重新载入</button>
       </main>
     ) : (

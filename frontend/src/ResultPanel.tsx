@@ -74,7 +74,7 @@ export function ResultPanel({
           <div className="result-title">
             <h2>{problem?.name ?? "我的一周"}</h2>
             <span className="sample-label">
-              {result ? "已求解" : summary.length ? "待确认变更" : "示例工作区"}
+              {result ? "已求解" : summary.length ? "待确认变更" : "待生成计划"}
             </span>
           </div>
           <p>

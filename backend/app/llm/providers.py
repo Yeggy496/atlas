@@ -51,7 +51,7 @@ class APIProvider:
         prefix = self.provider.upper()
         key = os.getenv(f'{prefix}_API_KEY','')
         if not key:
-            raise ValueError(f'尚未配置 {prefix}_API_KEY。可切换离线演示解析或手工编辑约束。')
+            raise ValueError(f'尚未配置 {prefix}_API_KEY。可切换规则解析或手工编辑约束。')
         default_base = 'https://api.openai.com/v1' if self.provider=='openai' else 'https://api.deepseek.com'
         base = (os.getenv(f'{prefix}_BASE_URL') or default_base).rstrip('/')
         model = os.getenv(f'{prefix}_MODEL','gpt-4.1-mini' if self.provider=='openai' else 'deepseek-flash')
@@ -158,16 +158,16 @@ class DemoProvider:
             sleep=re.search(r'睡眠?[^\d，。]*?(\d+(?:\.5)?)\s*小时',text)
             if sleep:
                 h=float(sleep[1])
-                if not 1<=h<=12: raise ValueError('演示版睡眠时长支持 1–12 小时。')
+                if not 1<=h<=12: raise ValueError('规则解析支持 1–12 小时的睡眠时长。')
                 for a in p.activities:
                     if a.category=='sleep': a.duration=int(h*2); a.window_end=int(h*2)
-                summary.append(f'每天连续睡眠 {h:g} 小时（示例采用 00:00 入睡）')
+                summary.append(f'每天连续睡眠 {h:g} 小时（预置方案采用 00:00 入睡）')
                 mark(r'睡')
             running=re.search(r'跑步\s*(\d+)\s*次',text)
             if running:
                 count=int(running[1]); each=re.search(r'每次\s*(\d+(?:\.5)?)\s*小时',text)
                 duration=int(float(each[1])*2) if each else 2
-                if not 1<=count<=7 or not 1<=duration<=8: raise ValueError('演示版支持每周 1–7 次跑步，每次 0.5–4 小时。')
+                if not 1<=count<=7 or not 1<=duration<=8: raise ValueError('规则解析支持每周 1–7 次跑步，每次 0.5–4 小时。')
                 replace_group('run','跑步','exercise',[duration]*count)
                 summary.append(f'每周跑步 {count} 次，每次 {duration/2:g} 小时')
                 mark(r'跑步|每次')
@@ -181,7 +181,7 @@ class DemoProvider:
             python=re.search(r'(\d+(?:\.5)?)\s*小时\s*Python|Python\s*(?:学习)?[^\d，。]*?(\d+(?:\.5)?)\s*小时',text,re.I)
             if python:
                 slots=int(float(python[1] or python[2])*2)
-                if not 1<=slots<=56: raise ValueError('演示版 Python 总学习时长支持 0.5–28 小时。')
+                if not 1<=slots<=56: raise ValueError('规则解析支持 0.5–28 小时的 Python 总学习时长。')
                 durations=[4]*(slots//4)+([slots%4] if slots%4 else [])
                 replace_group('python','Python 学习','study',durations)
                 summary.append(f'Python 学习共 {slots/2:g} 小时，每次最多 2 小时'); mark(r'Python|连续学习')
@@ -192,7 +192,7 @@ class DemoProvider:
                 amount=re.search(r'高数作业[^\d，。]*?(\d+(?:\.5)?)\s*小时',text)
                 if amount:
                     slots=int(float(amount[1])*2)
-                    if not 1<=slots<=40: raise ValueError('作业时长超出演示范围。')
+                    if not 1<=slots<=40: raise ValueError('规则解析支持 0.5–20 小时的作业时长。')
                     replace_group('math','高数作业','homework',[4]*(slots//4)+([slots%4] if slots%4 else []))
                 p.constraints=[c for c in p.constraints if not(c.type=='deadline' and c.target.startswith('math'))]
                 for a in p.activities:
@@ -217,7 +217,7 @@ class DemoProvider:
             if '机器学习' in text and re.search(r'连续\s*(?:2|两|二)\s*节',text):
                 for a in p.activities:
                     if '机器学习' in a.name: a.duration=4
-                summary.append('机器学习每次连续 2 小时（演示课时为 60 分钟）'); mark(r'机器学习')
+                summary.append('机器学习每次连续 2 小时（预置课时为 60 分钟）'); mark(r'机器学习')
             if re.search(r'连排|连堂|相邻|紧接|紧挨|接着',text):
                 flat=text.replace(' ','')
                 mentioned=[a for a in p.activities if a.name.replace(' ','') in flat]
@@ -230,9 +230,9 @@ class DemoProvider:
                 for a in p.activities:
                     if '数据库实验' in a.name: a.room_type='computer'
                 summary.append('数据库实验限定计算机实验室'); mark(r'数据库实验')
-        warnings += [f'未自动处理：{s}。请手工补充或配置 LLM 服务。' for i,s in enumerate(chunks) if i not in used]
+        warnings += [f'未自动处理：{s}。请在任务与约束中手工补充。' for i,s in enumerate(chunks) if i not in used]
         if not summary:
-            warnings.insert(0,'离线演示解析仅支持界面示例中的有限表达；当前输入没有生成变更。')
+            warnings.insert(0,'规则解析支持的表达有限；当前输入没有生成变更，请手工补充。')
         return validate_parse({'problem':p.model_dump(),'summary':summary,'warnings':warnings},'demo')
 
 
