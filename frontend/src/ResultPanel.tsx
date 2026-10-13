@@ -159,6 +159,11 @@ export function ResultPanel({
           {metric?.scheduled !== undefined && (
             <span>{metric.scheduled} 项活动已安排</span>
           )}
+          {result?.objective?.stability_applicable && metric?.changed !== undefined && (
+            <span className="change-count" title="与上一版相比，当前任务中移动或取消安排的原活动数量。新增和已删除任务不计入。">
+              原活动调整 {metric.changed} 项
+            </span>
+          )}
         </div>
         <span>
           {result ? `${metric?.solve_time}s · CP-SAT` : "确认约束后开始优化"}

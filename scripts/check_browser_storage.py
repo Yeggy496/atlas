@@ -21,7 +21,8 @@ url = args.url.rstrip('/')
 key = 'atlas.workspace.v1'
 draft_text = '我的本地草稿：周三19:00有一个会议，文字还没有提交识别。'
 task_name = '本地保存测试会议'
-report = {'url': url, 'version': '0.1.7', 'checks': [], 'page_errors': [], 'console_errors': []}
+expected_version = (Path(__file__).resolve().parent.parent / 'VERSION').read_text(encoding='utf-8').strip()
+report = {'url': url, 'version': expected_version, 'checks': [], 'page_errors': [], 'console_errors': []}
 launch = {'headless': True, 'viewport': {'width': 1440, 'height': 1000}}
 if args.proxy:
     launch['proxy'] = {'server': args.proxy}
@@ -64,7 +65,7 @@ with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_
     profile = str(Path(temp) / 'primary')
     context = p.chromium.launch_persistent_context(profile, **launch)
     page, requests = fresh(context)
-    assert page.request.get(url + '/api/health').json()['version'] == '0.1.7'
+    assert page.request.get(url + '/api/health').json()['version'] == expected_version
     initial = stored(page)['workspaces']['life']
     assert len(initial['previous']) == 35
     page.locator('textarea').fill(draft_text)

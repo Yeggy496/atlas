@@ -37,6 +37,9 @@ export function Calendar({
       problem.activities.find((a) => a.id === x.activity_id)?.category ===
       "sleep",
   );
+  const legend = Array.from(new Set(problem.activities.filter((a) => fullDay || a.category !== "sleep").map((a) => a.category)));
+  const sleepDurations = sleep.map((x) => (x.end - x.start) / 2);
+  const sameSleepTime = sleep.every((x) => x.start % 48 === sleep[0].start % 48 && x.end % 48 === sleep[0].end % 48);
   const startDate = new Date(`${problem.week_start}T12:00:00`);
   const getDate = (day: number) => {
     const date = new Date(startDate);
@@ -46,28 +49,10 @@ export function Calendar({
   return (
     <>
       <div className="calendar-subbar">
-        <span>
-          <span className="dot blue" />
-          课程
-        </span>
-        <span>
-          <span className="dot purple" />
-          学习
-        </span>
-        <span>
-          <span className="dot teal" />
-          {problem.scenario === "life"
-            ? "作业"
-            : problem.scenario === "meeting"
-              ? "会议"
-              : problem.scenario === "production"
-                ? "工序"
-                : "实验"}
-        </span>
-        <span>
-          <span className="dot orange" />
-          运动
-        </span>
+        {legend.map((key) => {
+          const category = CATEGORIES[key] ?? CATEGORIES.study;
+          return <span key={key}><span className={`dot ${category.color}`} />{category.label}</span>;
+        })}
         <button
           className={fullDay ? "sleep-toggle selected" : "sleep-toggle"}
           onClick={() => setFullDay(!fullDay)}
@@ -81,11 +66,12 @@ export function Calendar({
           <Moon size={14} />
           <span>睡眠已安排</span>
           <strong>
-            {sleep.length} 晚 · 每晚{" "}
-            {((sleep[0].end - sleep[0].start) / 2).toFixed(0)} 小时
+            {sleep.length} 段 · {Math.min(...sleepDurations) === Math.max(...sleepDurations)
+              ? `每段 ${sleepDurations[0]} 小时`
+              : `${Math.min(...sleepDurations)}–${Math.max(...sleepDurations)} 小时 / 段`}
           </strong>
           <span className="muted">
-            {clock(sleep[0].start)}–{clock(sleep[0].end)}
+            {sameSleepTime ? `${clock(sleep[0].start)}–${sleep[0].end % 48 === 0 ? "24:00" : clock(sleep[0].end)}` : "时间见全天日历"}
           </span>
         </div>
       )}

@@ -50,6 +50,7 @@ interface Props {
   setMode: (v: Mode) => void;
   weightsMeta: WeightsMeta | null;
   customWeights: Record<string, number> | null;
+  appliedWeights: Record<string, number> | null;
   setCustomWeights: (v: Record<string, number> | null) => void;
   setHelp: (v: boolean) => void;
   reviewed: boolean;
@@ -91,6 +92,7 @@ export function InputPanel({
   setMode,
   weightsMeta,
   customWeights,
+  appliedWeights,
   setCustomWeights,
   setHelp,
   reviewed,
@@ -366,7 +368,7 @@ export function InputPanel({
                 // must be passed explicitly because setCustomWeights is async and
                 // optimize() would otherwise still see the previous custom weights.
                 setCustomWeights(null);
-                void optimize(m.id, true, null);
+                void optimize(m.id, false, null);
               }}
               className={mode === m.id && !customWeights ? "active" : ""}
             >
@@ -381,13 +383,15 @@ export function InputPanel({
             : mode === "balanced"
               ? "兼顾目标、时间紧凑与每日负载。"
               : "优先保留已有安排，并提前完成截止任务。"}
-          <span className="mode-hint">切换档位会立即按新偏好重新求解</span>
+          <span className="mode-hint">{reviewed ? "切换档位会立即按新偏好重新求解" : "确认任务与约束后，按所选偏好生成计划"}</span>
           {mode !== "robust" && <span className="mode-hint">需要尽量保留原安排时，可选择稳健模式。</span>}
         </p>
         <WeightPanel
           meta={weightsMeta}
           mode={mode}
           weights={customWeights}
+          appliedWeights={appliedWeights}
+          reviewed={reviewed}
           busy={!!busy}
           onChange={setCustomWeights}
           onApply={(override) =>

@@ -56,6 +56,7 @@
   color: #5475d0;
 }
 .solver-strip {
+  flex-wrap: wrap;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -67,6 +68,7 @@
   font-size: 10px;
 }
 .solver-strip > div {
+  flex-wrap: wrap;
   display: flex;
   gap: 7px;
   align-items: center;
@@ -92,6 +94,7 @@
 }
 .calendar-subbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 14px;
   padding: 13px 20px;

@@ -627,14 +627,14 @@ export default function App() {
               <button
                 className="primary"
                 disabled={!!busy || !problem}
-                onClick={() => setAddingActivity(true)}
+                onClick={() => { setError(""); setAddingActivity(true); }}
               >
                 <Plus size={16} />
                 添加活动
               </button>
             </div>
           </section>
-          {error && (
+          {error && !constraintEditor && !addingActivity && !editingActivity && (
             <div className="message error" role="alert">
               <AlertTriangle size={17} />
               <span>{error}</span>
@@ -784,14 +784,15 @@ export default function App() {
                   warnings={warnings}
                   inputTab={inputTab}
                   setInputTab={setInputTab}
-                  setConstraintEditor={setConstraintEditor}
+                  setConstraintEditor={(c) => { setError(""); setConstraintEditor(c); }}
                   deleteConstraint={deleteConstraint}
                   deleteActivity={deleteActivity}
-                  editActivity={setEditingActivity}
+                  editActivity={(a) => { setError(""); setEditingActivity(a); }}
                   mode={mode}
                   setMode={setMode}
                   weightsMeta={weightsMeta}
                   customWeights={customWeights}
+                  appliedWeights={result?.objective?.weights ?? null}
                   setCustomWeights={setCustomWeights}
                   setHelp={setHelp}
                   reviewed={reviewed}
@@ -837,8 +838,11 @@ export default function App() {
         <ConstraintEditor
           problem={problem}
           initial={constraintEditor === "new" ? undefined : constraintEditor}
-          onClose={() => setConstraintEditor(null)}
+          error={error}
+          onClose={() => { setError(""); setConstraintEditor(null); }}
           onSave={async (c) => {
+            if (!c.label.trim()) { setError("请输入约束说明，不能只填写空格。"); return; }
+            setError("");
             try {
               const p = {
                 ...problem,
@@ -860,11 +864,15 @@ export default function App() {
         <ActivityEditor
           problem={problem}
           initial={editingActivity ?? undefined}
+          error={error}
           onClose={() => {
+            setError("");
             setAddingActivity(false);
             setEditingActivity(null);
           }}
           onSave={async (a, c) => {
+            if (!a.name.trim()) { setError("请输入活动名称，不能只填写空格。"); return; }
+            setError("");
             try {
               const activities = editingActivity
                 ? problem.activities.map((x) => (x.id === a.id ? a : x))

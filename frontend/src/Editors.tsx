@@ -14,10 +14,12 @@ export function Dialog({
   title,
   onClose,
   children,
+  error,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  error?: string;
 }) {
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -42,6 +44,7 @@ export function Dialog({
             <X size={20} />
           </button>
         </header>
+        {error && <div className="message error dialog-error" role="alert">{error}</div>}
         {children}
       </section>
     </div>
@@ -53,11 +56,13 @@ export function ConstraintEditor({
   initial,
   onSave,
   onClose,
+  error,
 }: {
   problem: Problem;
   initial?: Constraint;
-  onSave: (c: Constraint) => void;
+  onSave: (c: Constraint) => void | Promise<void>;
   onClose: () => void;
+  error?: string;
 }) {
   const [c, setC] = useState<Constraint>(
     initial ?? {
@@ -74,19 +79,39 @@ export function ConstraintEditor({
       source: "manual",
     },
   );
+  const [saving, setSaving] = useState(false);
   const update = (key: string, value: unknown) => setC({ ...c, [key]: value });
+  function changeType(type: Constraint["type"]) {
+    const activityOnly = ["fixed_time", "precedence", "min_gap", "consecutive"].includes(type);
+    setC({
+      ...c, type, level: type === "preferred_window" ? "soft" : "hard",
+      target: activityOnly && !problem.activities.some((a) => a.id === c.target)
+        ? (problem.activities[0]?.id ?? "") : c.target,
+      day: type === "fixed_time" ? (c.day ?? 0) : c.day,
+      end: type === "deadline"
+        ? Math.max(48, Math.min(336, Math.ceil(c.end / 48) * 48))
+        : ["unavailable", "time_window", "preferred_window"].includes(type) ? Math.min(48, c.end) : c.end,
+    });
+  }
   return (
-    <Dialog title={initial ? "编辑约束" : "添加约束"} onClose={onClose}>
+    <Dialog title={initial ? "编辑约束" : "添加约束"} onClose={onClose} error={error}>
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
-          onSave(c);
+          if (saving) return;
+          setSaving(true);
+          try {
+            await onSave({ ...c, label: c.label.trim() });
+          } finally {
+            setSaving(false);
+          }
         }}
       >
         <label>
           约束说明
           <input
             required
+            maxLength={160}
             value={c.label}
             onChange={(e) => update("label", e.target.value)}
             placeholder="例如：周三下午不可用"
@@ -96,19 +121,9 @@ export function ConstraintEditor({
           <label>
             约束类型
             <select
+              aria-label="约束类型"
               value={c.type}
-              onChange={(e) =>
-                setC({
-                  ...c,
-                  type: e.target.value as Constraint["type"],
-                  level:
-                    e.target.value === "preferred_window" ? "soft" : "hard",
-                  target:
-                    e.target.value === "fixed_time"
-                      ? (problem.activities[0]?.id ?? "")
-                      : c.target,
-                })
-              }
+              onChange={(e) => changeType(e.target.value as Constraint["type"])}
             >
               <option value="unavailable">不可用时间</option>
               <option value="fixed_time">固定开始时间</option>
@@ -124,8 +139,10 @@ export function ConstraintEditor({
           <label>
             作用对象
             <select
+              aria-label="作用对象"
               value={c.target}
-              onChange={(e) => update("target", e.target.value)}
+              onChange={(e) => setC({ ...c, target: e.target.value, other: c.other === e.target.value ? null : c.other })}
+              required
             >
               {!["fixed_time", "precedence", "min_gap", "consecutive"].includes(
                 c.type,
@@ -144,7 +161,7 @@ export function ConstraintEditor({
                       new Set(problem.activities.map((a) => a.category)),
                     ).map((cat) => (
                       <option value={cat} key={cat}>
-                        {cat}
+                      {CATEGORIES[cat]?.label ?? cat}
                       </option>
                     ))}
                   </optgroup>
@@ -170,6 +187,7 @@ export function ConstraintEditor({
             <label>
               日期
               <select
+                aria-label="日期"
                 value={c.day ?? -1}
                 onChange={(e) =>
                   update(
@@ -206,6 +224,7 @@ export function ConstraintEditor({
                 <label>
                   结束时间
                   <select
+                    aria-label="结束时间"
                     value={c.end}
                     onChange={(e) => update("end", Number(e.target.value))}
                   >
@@ -225,6 +244,7 @@ export function ConstraintEditor({
           <label>
             截止到
             <select
+              aria-label="截止到"
               value={c.end}
               onChange={(e) => update("end", Number(e.target.value))}
             >
@@ -240,6 +260,7 @@ export function ConstraintEditor({
           <label>
             后续活动
             <select
+              aria-label="后续活动"
               required
               value={c.other ?? ""}
               onChange={(e) => update("other", e.target.value)}
@@ -272,9 +293,9 @@ export function ConstraintEditor({
             ? "软约束：尽量满足，无法满足时会产生惩罚。"
             : "硬约束：必须满足，否则不返回合法计划。"}
         </div>
-        <button type="submit" className="primary wide">
+        <button type="submit" className="primary wide" disabled={saving}>
           <Check size={16} />
-          保存约束
+          {saving ? "正在保存…" : "保存约束"}
         </button>
       </form>
     </Dialog>
@@ -286,11 +307,13 @@ export function ActivityEditor({
   initial,
   onSave,
   onClose,
+  error,
 }: {
   problem: Problem;
   initial?: Activity;
-  onSave: (a: Activity, c?: Constraint) => void;
+  onSave: (a: Activity, c?: Constraint) => void | Promise<void>;
   onClose: () => void;
+  error?: string;
 }) {
   const fixedConstraint = initial
     ? problem.constraints.find(
@@ -300,6 +323,7 @@ export function ActivityEditor({
   const initialDay =
     fixedConstraint?.day ?? (initial?.days.length === 1 ? initial.days[0] : -1);
   const initialResources = initial?.resources ?? [];
+  const [saving, setSaving] = useState(false);
   const [name, setName] = useState(initial?.name ?? "");
   const [duration, setDuration] = useState(initial?.duration ?? 2);
   const [category, setCategory] = useState(initial?.category ?? "study");
@@ -327,10 +351,11 @@ export function ActivityEditor({
       ? `保留原有日期（共 ${initial.days.length} 天）`
       : "本周任意一天";
   return (
-    <Dialog title={initial ? "编辑活动" : "添加活动"} onClose={onClose}>
+    <Dialog title={initial ? "编辑活动" : "添加活动"} onClose={onClose} error={error}>
       <form
-        onSubmit={(e) => {
+        onSubmit={async (e) => {
           e.preventDefault();
+          if (saving) return;
           const aid = initial?.id ?? id();
           const cleanName = name.trim();
           const constraintDay = day === -1 ? 2 : day;
@@ -366,7 +391,9 @@ export function ActivityEditor({
             window_end: fixed ? 48 : (initial?.window_end ?? 44),
             optional,
           };
-          onSave(
+          setSaving(true);
+          try {
+            await onSave(
             a,
             fixed
               ? {
@@ -384,7 +411,10 @@ export function ActivityEditor({
                   source: fixedConstraint?.source ?? "manual",
                 }
               : undefined,
-          );
+            );
+          } finally {
+            setSaving(false);
+          }
         }}
       >
         <label>
@@ -402,6 +432,7 @@ export function ActivityEditor({
           <label>
             时长
             <select
+              aria-label="时长"
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value))}
             >
@@ -415,6 +446,7 @@ export function ActivityEditor({
           <label>
             类别
             <select
+              aria-label="类别"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
@@ -429,6 +461,7 @@ export function ActivityEditor({
         <label>
           占用资源
           <select
+            aria-label="占用资源"
             value={resource}
             onChange={(e) => setResource(e.target.value)}
           >
@@ -448,7 +481,7 @@ export function ActivityEditor({
         </label>
         <label>
           日期
-          <select value={day} onChange={(e) => setDay(Number(e.target.value))}>
+          <select aria-label="日期" value={day} onChange={(e) => setDay(Number(e.target.value))}>
             {!fixed && <option value={-1}>{initialDayLabel}</option>}
             {DAYS.map((d, i) => (
               <option key={d} value={i}>
@@ -488,9 +521,9 @@ export function ActivityEditor({
           />
           可选活动，允许时间不足时不安排
         </label>
-        <button type="submit" className="primary wide">
+        <button type="submit" className="primary wide" disabled={saving}>
           {initial ? <Check size={16} /> : <Plus size={16} />}
-          {initial ? "保存修改" : "添加并检查约束"}
+          {saving ? "正在保存…" : initial ? "保存修改" : "添加并检查约束"}
         </button>
       </form>
     </Dialog>

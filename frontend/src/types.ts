@@ -187,7 +187,7 @@ export const SCENARIOS: Record<
 };
 
 export const CATEGORIES: Record<string, { label: string; color: string }> = {
-  course: { label: "固定课程", color: "blue" },
+  course: { label: "课程", color: "blue" },
   study: { label: "学习", color: "purple" },
   homework: { label: "作业", color: "teal" },
   exercise: { label: "运动", color: "orange" },
