@@ -248,6 +248,11 @@ export function ConstraintEditor({
               value={c.end}
               onChange={(e) => update("end", Number(e.target.value))}
             >
+              {(c.end === 0 || c.end % 48 !== 0) && (
+                <option value={c.end}>
+                  {DAYS[Math.floor(c.end / 48)]} {clock(c.end)}
+                </option>
+              )}
               {DAYS.map((d, i) => (
                 <option value={(i + 1) * 48} key={d}>
                   {d} 24:00

@@ -133,6 +133,26 @@ with sync_playwright() as p:
             expect(page.locator('.calendar-subbar > span').filter(has_text=category).locator('.dot')).to_have_class('dot ' + color)
         report['checks'].append('meeting and production legend colors match actual calendar events')
         template = page.request.get(url + '/api/templates/life').json()
+        precise_deadline = next(c for c in template['constraints'] if c['type'] == 'deadline')
+        precise_deadline['end'] = 120
+        precise_deadline['label'] = '周三 12:00 高数作业截止'
+        response = page.request.post(url + '/api/solve', data={'problem': template, 'reviewed': True, 'mode': 'balanced'})
+        assert response.ok, response.text()
+        precise_result = response.json()
+        assert precise_result['status'] in ['FEASIBLE', 'OPTIMAL']
+        with page.expect_response(lambda r: r.url.endswith('/api/history')) as pending:
+            page.get_by_role('button', name='求解历史', exact=True).click()
+        rows = pending.value.json()
+        index = next(i for i, row in enumerate(rows) if row['id'] == precise_result['run_id'])
+        expect(page.locator('.history-row')).to_have_count(len(rows))
+        page.locator('.history-row').nth(index).click()
+        card = page.locator('.constraint-card').filter(has_text=precise_deadline['label'])
+        card.get_by_role('button', name='编辑 ' + precise_deadline['label'], exact=True).click()
+        deadline_dialog = page.get_by_role('dialog', name='编辑约束', exact=True)
+        expect(deadline_dialog.get_by_label('截止到', exact=True)).to_have_value('120')
+        expect(deadline_dialog.locator('select[aria-label="截止到"] option:checked')).to_have_text('周三 12:00')
+        deadline_dialog.get_by_role('button', name='关闭', exact=True).click()
+        report['checks'].append('editing an existing midday deadline displays its exact stored time')
         sleep_activities = [a for a in template['activities'] if a['category'] == 'sleep']
         for a in sleep_activities:
             a['duration'] = 15
