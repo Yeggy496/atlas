@@ -12,6 +12,10 @@
   align-items: center;
   gap: 8px;
 }
+.local-save-status {
+  padding-left: 8px;
+  border-left: 1px solid #d9e1ef;
+}
 .workspace-footer button {
   font-size: 10px;
   color: #879bbf;

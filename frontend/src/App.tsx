@@ -43,6 +43,7 @@ import {
 import { api, exportPlan as exportPlanRequest, readResponse } from "./api";
 import { Calendar } from "./Calendar";
 import { ActivityEditor, ConstraintEditor, Dialog } from "./Editors";
+import { readLocalWorkspaces, writeLocalWorkspaces, type LocalWorkspace } from "./localWorkspace";
 import {
   type Activity,
   type Assignment,
@@ -70,29 +71,35 @@ const SCENARIO_ICONS: Record<Scenario, typeof CalendarDays> = {
 };
 
 export default function App() {
-  const [problem, setProblem] = useState<Problem | null>(null),
-    [result, setResult] = useState<Result | null>(null);
-  const [scenario, setScenario] = useState<Scenario>("life"),
-    [mode, setMode] = useState<Mode>("balanced");
+  const [local] = useState(readLocalWorkspaces);
+  const initial = local.store.workspaces[local.store.active_scenario];
+  const localStore = useRef(local.store);
+  const [localReady, setLocalReady] = useState(!!initial);
+  const [saveWarning, setSaveWarning] = useState("");
+  const [locallySaved, setLocallySaved] = useState(!!initial);
+  const [problem, setProblem] = useState<Problem | null>(initial?.problem ?? null),
+    [result, setResult] = useState<Result | null>(initial?.result ?? null);
+  const [scenario, setScenario] = useState<Scenario>(local.store.active_scenario),
+    [mode, setMode] = useState<Mode>(initial?.mode ?? "balanced");
   // Custom weight profile (MASTER_SPEC §15). null means "use the preset as-is";
   // the slider panel populates it when the user switches to 自定义.
   const [customWeights, setCustomWeights] = useState<Record<string, number> | null>(
-      null,
+      initial?.customWeights ?? null,
     ),
     [weightsMeta, setWeightsMeta] = useState<WeightsMeta | null>(null);
   const [busy, setBusy] = useState(""),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
-  const [input, setInput] = useState(SCENARIOS.life.input),
+  const [input, setInput] = useState(initial?.input ?? SCENARIOS[local.store.active_scenario].input),
     [provider, setProvider] = useState("demo");
   const [version, setVersion] = useState("");
-  const [reviewed, setReviewed] = useState(true),
-    [summary, setSummary] = useState<string[]>([]),
-    [warnings, setWarnings] = useState<string[]>([]);
+  const [reviewed, setReviewed] = useState(initial?.reviewed ?? true),
+    [summary, setSummary] = useState<string[]>(initial?.summary ?? []),
+    [warnings, setWarnings] = useState<string[]>(initial?.warnings ?? []);
   const [inputTab, setInputTab] = useState<"constraints" | "activities">(
-      "constraints",
+      initial?.inputTab ?? "constraints",
     ),
-    [view, setView] = useState<"calendar" | "resources">("calendar");
+    [view, setView] = useState<"calendar" | "resources">(initial?.view ?? "calendar");
   const [page, setPage] = useState<"workspace" | "history">("workspace"),
     [history, setHistory] = useState<HistoryRun[]>([]);
   const [constraintEditor, setConstraintEditor] = useState<
@@ -106,28 +113,82 @@ export default function App() {
     [help, setHelp] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null),
     textFileRef = useRef<HTMLInputElement>(null),
-    previous = useRef<Assignment[]>([]),
+    previous = useRef<Assignment[]>(initial?.previous ?? []),
     loadCounter = useRef(0);
 
-  async function load(s: Scenario) {
+  const snapshot = useRef<LocalWorkspace | null>(null);
+  const canSave = useRef(false);
+  snapshot.current = problem && problem.scenario === scenario ? {
+    problem, result, previous: previous.current, input, mode, customWeights,
+    reviewed, summary, warnings, inputTab, view,
+  } : null;
+  canSave.current = localReady;
+
+  function saveLocal() {
+    const current = snapshot.current;
+    if (!canSave.current || !current) return;
+    const s = current.problem.scenario;
+    localStore.current = {
+      ...localStore.current, active_scenario: s,
+      workspaces: { ...localStore.current.workspaces, [s]: current },
+    };
+    const warning = writeLocalWorkspaces(localStore.current);
+    setSaveWarning(warning);
+    setLocallySaved(!warning);
+  }
+  function restoreLocal(saved: LocalWorkspace) {
+    setProblem(saved.problem);
+    setResult(saved.result);
+    previous.current = saved.previous;
+    setScenario(saved.problem.scenario);
+    setInput(saved.input);
+    setMode(saved.mode);
+    setCustomWeights(saved.customWeights);
+    setReviewed(saved.reviewed);
+    setSummary(saved.summary);
+    setWarnings(saved.warnings);
+    setInputTab(saved.inputTab);
+    setView(saved.view);
+    setLocalReady(true);
+  }
+  // Save edits, including unparsed text and unconfirmed drafts. Do not save a
+  // half-switched template or overwrite another scenario's workspace.
+  useEffect(saveLocal, [localReady, scenario, problem, result, input, mode,
+    customWeights, reviewed, summary, warnings, inputTab, view]);
+  useEffect(() => {
+    const flush = () => saveLocal();
+    const hidden = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, []);
+
+  async function load(s: Scenario, reset = false) {
+    saveLocal();
     const version = ++loadCounter.current;
-    setBusy("正在生成预置方案");
-    setError("");
-    setNotice("");
-    setResult(null);
-    setSummary([]);
-    setWarnings([]);
-    setCustomWeights(null);
-    previous.current = [];
-    setReviewed(true);
-    setScenario(s);
-    setInput(SCENARIOS[s].input);
+    setSelected(null);
     setPage("workspace");
-    setView("calendar");
+    setError("");
+    const saved = !reset && localStore.current.workspaces[s];
+    if (saved) {
+      restoreLocal(saved);
+      setNotice("已恢复此浏览器上次保存的内容。");
+      return;
+    }
+    setLocalReady(false);
+    setBusy("正在生成预置方案");
+    setNotice("");
     try {
       const p = await api<Problem>(`/templates/${s}`);
       if (version !== loadCounter.current) return;
-      setProblem(p);
+      restoreLocal({
+        problem: p, result: null, previous: [], input: SCENARIOS[s].input,
+        mode: "balanced", customWeights: null, reviewed: true,
+        summary: [], warnings: [], inputTab: "constraints", view: "calendar",
+      });
       const r = await api<Result>("/solve", {
         problem: p,
         reviewed: true,
@@ -140,7 +201,7 @@ export default function App() {
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      if (version === loadCounter.current) setBusy("");
+      if (version === loadCounter.current) { setBusy(""); setLocalReady(true); }
     }
   }
   useEffect(() => {
@@ -151,7 +212,10 @@ export default function App() {
     api<WeightsMeta>("/weights")
       .then((x) => setWeightsMeta(x))
       .catch(() => setWeightsMeta(null));
-    void load("life");
+    if (initial) setNotice(local.warning || "已恢复此浏览器上次保存的内容。");
+    else void load(local.store.active_scenario).then(() => {
+      if (local.warning) setNotice(local.warning);
+    });
   }, []);
   useEffect(() => {
     if (!notice) return;
@@ -552,7 +616,7 @@ export default function App() {
               <button
                 className="secondary"
                 disabled={!!busy}
-                onClick={() => void load(scenario)}
+                onClick={() => void load(scenario, true)}
               >
                 <RotateCcw size={15} />
                 恢复预置方案
@@ -576,6 +640,12 @@ export default function App() {
               </button>
             </div>
           )}
+          {saveWarning && (
+            <div className="message error storage-warning" role="alert">
+              <AlertTriangle size={17} />
+              <span>{saveWarning}</span>
+            </div>
+          )}
           {notice && (
             <div className="toast" role="status">
               <CheckCircle2 size={17} />
@@ -594,7 +664,7 @@ export default function App() {
               {history.length === 0 ? (
                 <div className="empty-state">
                   <History size={30} />
-                  <p>生成第一份计划后，求解记录会保存在这里。</p>
+              <p>生成第一份计划后，求解记录会保存在这里。</p>
                 </div>
               ) : (
                 history.map((h) => (
@@ -603,6 +673,7 @@ export default function App() {
                     key={h.id}
                     disabled={!!busy}
                     onClick={() => {
+                      saveLocal();
                       setProblem(h.problem);
                       setResult(h.result);
                       previous.current = h.result.assignments;
@@ -745,6 +816,7 @@ export default function App() {
                 <span>
                   <Clock3 size={14} />
                   时间精度：30 分钟
+                  <span className="local-save-status">{saveWarning ? "本地保存不可用" : locallySaved ? "已保存在此浏览器" : "本地自动保存"}</span>
                 </span>
                 <button
                   onClick={() => setHelp(true)}
@@ -918,6 +990,10 @@ export default function App() {
       {help && (
         <Dialog title="使用 ATLAS-Σ" onClose={() => setHelp(false)}>
           <div className="help-content">
+            <div className="form-note">
+              工作内容自动保存在当前浏览器，刷新、重新打开及切换场景时会恢复上次内容。
+              点击“恢复预置方案”只会替换当前场景的内容。不同电脑或浏览器各自保存，不会自动同步；清除网站数据或结束无痕浏览会丢失本地保存。
+            </div>
             <ol>
               <li>
                 <strong>选择一个场景</strong>

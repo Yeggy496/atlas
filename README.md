@@ -6,7 +6,8 @@ A small scheduling application for personal weekly planning, one-class academic 
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Current update: [v0.1.6 product interface notes](docs/RELEASE_0.1.6.md).
+Current update: [v0.1.7 local workspace notes](docs/RELEASE_0.1.7.md).
+Product interface notes: [v0.1.6](docs/RELEASE_0.1.6.md).
 DeepSeek setup and connection verification: [v0.1.5 notes](docs/RELEASE_0.1.5.md).
 Verified capability report before this update: [2026-10-12 review](docs/REVIEW_2026-10-12.md).
 The default provider remains `demo`; real model calls require server-side configuration.
@@ -52,6 +53,7 @@ Health check: `/api/health`.
 - Real calendars, resource allocation, weighted objectives, conflict diagnosis with verified repair candidates, and rescheduling.
 - CSV/XLSX activity imports using the downloadable templates; maximum 2 MB and 100 rows.
 - Constraints require validation and explicit user review before solving.
+- Workspaces auto-save in the current browser, separately for each scenario. Reloads and reopening restore inputs, drafts, settings, and the last result without loading or solving the preset again. Different browser profiles/devices do not sync; clearing site data removes the local copy.
 - Default `LLM_PROVIDER=demo` is a limited offline rule parser, clearly identified in the UI.
 - OpenAI and DeepSeek provider implementations accept server-only environment variables; real API calls require configuration and verification.
 - Time resolution is 30 minutes. This demo targets small inputs, not a whole school.
