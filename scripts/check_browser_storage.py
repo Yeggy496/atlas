@@ -139,6 +139,24 @@ with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_
         report['checks'].append('reset replaces only the current scenario')
         page.get_by_role('button', name='个人周计划', exact=True).click()
         expect(page.locator('textarea')).to_have_value(draft_text)
+        # Same browser, different tabs: editing one scenario must not erase
+        # another tab's more recent edits to a different scenario.
+        second_tab, second_requests = watch(context)
+        second_tab.goto(url, wait_until='networkidle', timeout=120000)
+        second_tab.get_by_role('button', name='智能排课', exact=True).click()
+        second_tab.locator('textarea').fill('另一标签页的课程草稿')
+        wait_saved(second_tab, 'data.workspaces.academic.input === "另一标签页的课程草稿"')
+        page.locator('textarea').fill('主标签页的个人计划草稿')
+        wait_saved(page, 'data.workspaces.life.input === "主标签页的个人计划草稿"')
+        assert stored(page)['workspaces']['academic']['input'] == '另一标签页的课程草稿'
+        page.get_by_role('button', name='智能排课', exact=True).click()
+        expect(page.locator('textarea')).to_have_value('另一标签页的课程草稿')
+        page.get_by_role('button', name='个人周计划', exact=True).click()
+        page.locator('textarea').fill(draft_text)
+        wait_saved(page, 'data.workspaces.life.input === ' + json.dumps(draft_text))
+        assert not second_requests
+        second_tab.close()
+        report['checks'].append('multiple tabs preserve each other\'s edits to different scenarios')
         other = p.chromium.launch_persistent_context(str(Path(temp) / 'other'), **launch)
         other_page, _ = fresh(other)
         assert stored(other_page)['workspaces']['life']['input'] != draft_text

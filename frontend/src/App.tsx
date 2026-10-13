@@ -128,9 +128,12 @@ export default function App() {
     const current = snapshot.current;
     if (!canSave.current || !current) return;
     const s = current.problem.scenario;
+    // Another tab may have edited a different scenario since this tab opened.
+    // Only replace this workspace; keep the latest stored copies of the others.
+    const latest = readLocalWorkspaces().store.workspaces;
     localStore.current = {
       ...localStore.current, active_scenario: s,
-      workspaces: { ...localStore.current.workspaces, [s]: current },
+      workspaces: { ...localStore.current.workspaces, ...latest, [s]: current },
     };
     const warning = writeLocalWorkspaces(localStore.current);
     setSaveWarning(warning);
