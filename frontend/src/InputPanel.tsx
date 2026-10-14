@@ -36,6 +36,9 @@ interface Props {
   provider: string;
   input: string;
   setInput: (v: string) => void;
+  clearContent: () => void;
+  clearConstraints: () => void;
+  clearActivities: () => void;
   parse: () => Promise<void>;
   scenario: Scenario;
   summary: string[];
@@ -78,6 +81,9 @@ export function InputPanel({
   provider,
   input,
   setInput,
+  clearContent,
+  clearConstraints,
+  clearActivities,
   parse,
   scenario,
   summary,
@@ -160,6 +166,7 @@ export function InputPanel({
         </div>
       </div>
       <div className="input-meta">
+        <div className="input-clear-actions">
         <button
           type="button"
           className="clear-input-button"
@@ -170,6 +177,17 @@ export function InputPanel({
           <X size={12} />
           清空输入
         </button>
+        <button
+          type="button"
+          className="clear-input-button clear-content-button"
+          disabled={!!busy || !problem || !(input.length || problem.activities.length || problem.constraints.length || summary.length || warnings.length)}
+          onClick={clearContent}
+          title="清空当前场景的输入、活动与约束"
+        >
+          <Trash2 size={12} />
+          清空当前内容
+        </button>
+        </div>
         <p id="input-length-hint" className={`input-length-hint ${inputTooLong ? "too-long" : ""}`}>
           {inputTooLong ? "文本较长，请分段识别，或精简到 4,000 字以内。" : `${input.length.toLocaleString()} / 4,000 字`}
         </p>
@@ -249,6 +267,16 @@ export function InputPanel({
           onClick={() => setConstraintEditor("new")}
         >
           <Plus size={16} />
+        </button>
+      </div>
+      <div className="collection-tools">
+        <button
+          type="button"
+          disabled={!!busy || !problem || !(inputTab === "constraints" ? problem.constraints.length : problem.activities.length)}
+          onClick={inputTab === "constraints" ? clearConstraints : clearActivities}
+        >
+          <Trash2 size={12}/>
+          {inputTab === "constraints" ? "清空约束" : "清空活动"}
         </button>
       </div>
       <div className="constraint-list">

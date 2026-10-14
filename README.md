@@ -6,7 +6,7 @@ A small scheduling application for personal weekly planning, one-class academic 
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Current version: v0.1.10 adds an input-clear button that preserves the current tasks and plan.
+Current version: v0.1.11 supports clearing input, constraints, activities, or all current content; bulk actions require confirmation and support undo.
 Product workflow notes: [v0.1.9](docs/RELEASE_0.1.9.md).
 Local workspace notes: [v0.1.7](docs/RELEASE_0.1.7.md).
 Product interface notes: [v0.1.6](docs/RELEASE_0.1.6.md).

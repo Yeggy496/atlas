@@ -72,6 +72,7 @@ const SCENARIO_ICONS: Record<Scenario, typeof CalendarDays> = {
   meeting: Users,
   production: Factory,
 };
+type ReplacementAction = "preset" | "blank" | "clear-all" | "clear-constraints" | "clear-activities";
 
 function mondayOf(date: string): string {
   const day = new Date(`${date}T12:00:00Z`);
@@ -114,7 +115,7 @@ export default function App() {
   const [page, setPage] = useState<"workspace" | "history">("workspace"),
     [history, setHistory] = useState<LocalRun[]>([]);
   const [resourcesOpen, setResourcesOpen] = useState(false);
-  const [confirmation, setConfirmation] = useState<"preset" | "blank" | LocalWorkspace | null>(null);
+  const [confirmation, setConfirmation] = useState<ReplacementAction | LocalWorkspace | null>(null);
   const [undo, setUndo] = useState<{ restore: LocalWorkspace; removeScenario?: Scenario } | null>(null);
   const [baseline, setBaseline] = useState<PlanBaseline | null>(null);
   const [constraintEditor, setConstraintEditor] = useState<
@@ -500,7 +501,24 @@ export default function App() {
     rememberReplacement(typeof action === "string" ? scenario : action.problem.scenario);
     if (action === "preset") { await load(scenario, true); return; }
     saveLocal(); setPage("workspace"); setSelected(null); setError("");
-    if (action === "blank") {
+    if (action === "clear-all" || action === "clear-constraints" || action === "clear-activities") {
+      const saved = snapshot.current;
+      if (!saved) return;
+      const clearingActivities = action !== "clear-constraints";
+      const resourceTargets = new Set(["*", ...problem.resources.map((r) => r.id)]);
+      const remainingConstraints = action === "clear-activities" ? problem.constraints.filter((c) =>
+        resourceTargets.has(c.target) && c.other === null &&
+        !["fixed_time", "precedence", "min_gap", "consecutive"].includes(c.type)) : [];
+      restoreLocal({ ...saved,
+        problem: { ...problem, activities: clearingActivities ? [] : problem.activities, constraints: remainingConstraints },
+        input: action === "clear-all" ? "" : saved.input,
+        result: null, previous: clearingActivities ? [] : saved.previous,
+        ...(clearingActivities ? { previousProblem: { ...problem, activities: [], constraints: remainingConstraints } } : {}),
+        reviewed: false, summary: [], warnings: [],
+      });
+      setNotice(action === "clear-all" ? "已清空当前输入、活动和约束，可撤销恢复。" :
+        action === "clear-constraints" ? "已清空约束，活动与输入已保留，可撤销恢复。" : "已清空活动及关联约束，可撤销恢复。");
+    } else if (action === "blank") {
       restoreLocal({ problem: { ...problem, name: `我的${SCENARIOS[scenario].title}`,
         week_start: mondayOf(new Date().toLocaleDateString("sv-SE")), activities: [], constraints: [] },
         result: null, previous: [], input: "", mode: "balanced", customWeights: null,
@@ -901,6 +919,9 @@ export default function App() {
                   provider={provider}
                   input={input}
                   setInput={setInput}
+                  clearContent={() => setConfirmation("clear-all")}
+                  clearConstraints={() => setConfirmation("clear-constraints")}
+                  clearActivities={() => setConfirmation("clear-activities")}
                   parse={parse}
                   scenario={scenario}
                   summary={summary}
@@ -967,13 +988,20 @@ export default function App() {
           setNotice("资源已更新，请确认约束并重新生成计划。");
         }}/>
       </Dialog>}
-      {confirmation && <Dialog title={confirmation === "preset" ? "恢复预置方案？" : confirmation === "blank" ? "新建自己的计划？" : "恢复工作空间备份？"}
+      {confirmation && <Dialog title={confirmation === "preset" ? "恢复预置方案？" : confirmation === "blank" ? "新建自己的计划？" :
+        confirmation === "clear-all" ? "清空当前内容？" : confirmation === "clear-constraints" ? "清空所有约束？" :
+        confirmation === "clear-activities" ? "清空所有活动？" : "恢复工作空间备份？"}
         onClose={() => setConfirmation(null)}>
         <div className="replacement-content">
-          <p>{confirmation === "preset" ? "当前场景的任务、输入与计划将替换为预置内容。其他场景保持原样。" : confirmation === "blank" ? "清空当前场景的活动与约束，保留资源，开始安排自己的任务。" : "将打开备份对应的场景，恢复任务、约束和输入。请重新确认并求解，确保计划有效。"}</p>
+          <p>{confirmation === "preset" ? "当前场景的任务、输入与计划将替换为预置内容。其他场景保持原样。" : confirmation === "blank" ? "清空当前场景的活动与约束，保留资源，开始安排自己的任务。" :
+            confirmation === "clear-all" ? "将清空当前场景的输入文字、全部活动和约束，并移除当前计划。资源、所选周和其他场景会保留。" :
+            confirmation === "clear-constraints" ? "将删除当前场景的全部约束，保留活动和输入文字。当前计划会移除，检查确认后可重新生成。" :
+            confirmation === "clear-activities" ? "将删除当前场景的全部活动及其关联约束，并移除当前计划。输入文字、资源与通用约束会保留。" :
+            "将打开备份对应的场景，恢复任务、约束和输入。请重新确认并求解，确保计划有效。"}</p>
           <div className="form-note">替换前可取消并下载备份。完成后可点击“撤销修改”恢复上一次内容。</div>
           <div className="replacement-actions"><button className="secondary" onClick={() => setConfirmation(null)}>取消</button>
-            <button className="primary" onClick={() => void confirmReplacement()}>确认{confirmation === "blank" ? "新建" : "恢复"}</button></div>
+            <button className="primary" onClick={() => void confirmReplacement()}>确认{confirmation === "blank" ? "新建" :
+              typeof confirmation === "string" && confirmation.startsWith("clear-") ? "清空" : "恢复"}</button></div>
         </div>
       </Dialog>}
       {problem && constraintEditor && (
