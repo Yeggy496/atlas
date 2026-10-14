@@ -26,7 +26,7 @@ from .llm.providers import get_provider
 from .llm.explanation_service import get_explanation_service
 from .importer import import_table, extract_text
 from .exporters import build_xlsx, build_pdf
-from .storage import init_db, save_run, recent_runs
+from .storage import init_db, save_run, recent_runs, server_history_enabled
 
 
 @asynccontextmanager
@@ -53,7 +53,8 @@ app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http:/
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','version':APP_VERSION,'solver':'OR-Tools CP-SAT','provider':os.getenv('LLM_PROVIDER','demo'),'slot_minutes':30}
+    return {'status':'ok','version':APP_VERSION,'solver':'OR-Tools CP-SAT','provider':os.getenv('LLM_PROVIDER','demo'),'slot_minutes':30,
+            'history_scope':'server' if server_history_enabled() else 'browser'}
 
 
 @app.get('/api/weights')
@@ -207,6 +208,7 @@ def import_text(file:UploadFile=File(...)):
 
 @app.get('/api/history')
 def history():
+    """Compatibility route; public deployments keep history in each browser."""
     return recent_runs()
 
 
@@ -215,8 +217,7 @@ def export_plan(fmt:str,request:ExportRequest):
     """Export a solved schedule as XLSX or PDF (MASTER_SPEC §25 P2).
 
     The export is built from the same solved result the UI displayed, so the file
-    can never disagree with the screen. XLSX carries the full Chinese schedule;
-    PDF is an ASCII summary (see ``exporters`` for why).
+    can never disagree with the screen. Both formats carry the Chinese schedule.
     """
     fmt=fmt.lower()
     if fmt not in ('xlsx','pdf'):

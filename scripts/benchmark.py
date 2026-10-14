@@ -328,13 +328,15 @@ def render_markdown(rows, summary, meta):
         [[m, s['hard_violations'], f"{s['preference_score']:.2f}",
           f"{s['valid_instances']}/{s['instances']}"] for m, s in summary.items()])
     provider_note = '（离线占位，非真实模型）' if meta['provider'] not in REAL_PROVIDERS else ''
+    model_line = (f"LLM provider：{meta['provider']} {provider_note}" if 'llm' in meta['methods']
+                  else '本轮仅比较调度方法，未进行大模型效果对比。')
     parts = [
         '# ATLAS-Σ 对比实验结果',
         '',
         f"生成时间：{meta['generated_at']}　求解器种子：{meta['seed']}　ATLAS 时限：{meta['atlas_seconds']}s",
-        f"LLM provider：{meta['provider']} {provider_note}",
+        model_line,
         '',
-        '## 1. 汇总（三个出厂场景）',
+        '## 1. 汇总（预置场景实例）',
         '',
         summary_table,
         '',
@@ -346,11 +348,12 @@ def render_markdown(rows, summary, meta):
         '',
         table4,
         '',
-        '## 4. 求解规模与耗时（ATLAS-Σ，三个真实场景）',
+        '## 4. 求解规模与耗时（ATLAS-Σ，预置场景实例）',
         '',
         efficiency,
         '',
         '> 所有数字均由 scripts/benchmark.py 真实运行得到；ATLAS-Σ 一列通过独立校验器 verify() 复核，硬约束违反必须为 0。',
+        '> 数据为预置任务，不是真实用户试点。random 不检查跨活动约束；greedy 是简化的最早可行时段法，未实现前置关系、每日上限与偏好。该对比只说明这些实例需要完整约束检查，不代表超越成熟调度算法，也不证明规模泛化。',
     ]
     return '\n'.join(parts) + '\n'
 

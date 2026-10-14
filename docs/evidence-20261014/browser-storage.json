@@ -1,0 +1,23 @@
+{
+  "url": "http://127.0.0.1:8019",
+  "version": "0.1.9",
+  "checks": [
+    "unparsed text and last result survive immediate refresh without solving",
+    "unconfirmed task/constraint draft, custom weights and previous assignments survive refresh",
+    "scenario switching restores separate workspaces without solving again",
+    "confirmed restored draft solves using saved weights and previous schedule",
+    "closing and reopening browser restores last active scenario from disk",
+    "reset replaces only the current scenario",
+    "multiple tabs preserve each other's edits to different scenarios",
+    "different browser profiles keep independent content",
+    "malformed stored JSON and invalid workspace shape recover without blank page",
+    "storage quota failure is visible and does not break scheduling"
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "solve": {
+    "status": "OPTIMAL",
+    "scheduled": 36,
+    "hard_violations": 0
+  }
+}

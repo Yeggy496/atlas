@@ -6,6 +6,7 @@ export interface LocalWorkspace {
   problem: Problem;
   result: Result | null;
   previous: Assignment[];
+  previousProblem?: Problem;
   input: string;
   mode: Mode;
   customWeights: Record<string, number> | null;
@@ -77,8 +78,9 @@ function result(value: unknown, p: Problem): value is Result | null {
     list(value.repairs, 200, (r) => typeof r.constraint_id === "string" && typeof r.label === "string" &&
       typeof r.detail === "string" && typeof r.verified === "boolean");
 }
-function workspace(value: unknown, s: Scenario): value is LocalWorkspace {
+export function isLocalWorkspace(value: unknown, s: Scenario): value is LocalWorkspace {
   return record(value) && problem(value.problem, s) && result(value.result, value.problem) &&
+    (value.previousProblem === undefined || problem(value.previousProblem, s)) &&
     assignments(value.previous) && typeof value.input === "string" &&
     ["efficient", "balanced", "robust"].includes(String(value.mode)) &&
     (value.customWeights === null || numbers(value.customWeights)) && typeof value.reviewed === "boolean" &&
@@ -100,13 +102,27 @@ export function readLocalWorkspaces(): { store: WorkspaceStore; warning: string 
     for (const s of Object.keys(SCENARIOS) as Scenario[]) {
       if (!Object.hasOwn(data.workspaces, s)) continue;
       const saved = data.workspaces[s];
-      if (workspace(saved, s)) store.workspaces[s] = saved;
+      if (isLocalWorkspace(saved, s)) store.workspaces[s] = saved;
       else damaged = true;
     }
     return { store, warning: damaged ? "部分本地数据无法恢复，已忽略损坏的内容。" : "" };
   } catch {
     return { store: empty, warning: "无法读取本地保存，已打开预置方案。" };
   }
+}
+
+/** Backups are data, not executable configuration; validate again on the server before use. */
+export function readWorkspaceBackup(raw: string): LocalWorkspace {
+  if (raw.length > 2_000_000) throw new Error("备份文件不能超过 2 MB。");
+  let data: unknown;
+  try { data = JSON.parse(raw); } catch { throw new Error("文件不是有效的 JSON 备份。"); }
+  if (!record(data) || data.format !== "atlas-workspace" || data.version !== 1 ||
+    !record(data.workspace) || !record(data.workspace.problem) ||
+    !scenario(data.workspace.problem.scenario) ||
+    !isLocalWorkspace(data.workspace, data.workspace.problem.scenario)) {
+    throw new Error("请选择由“备份工作空间”下载的 ATLAS 文件，原有内容未改变。");
+  }
+  return data.workspace;
 }
 
 export function writeLocalWorkspaces(store: WorkspaceStore): string {

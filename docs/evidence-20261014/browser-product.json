@@ -1,0 +1,38 @@
+{
+  "url": "http://127.0.0.1:8019",
+  "checks": [
+    "public server history does not disclose visitor problems or results",
+    "destructive replacement can be cancelled or undone without losing the original plan",
+    "a new personal plan uses the selected Monday and rescheduling reports actual preserved assignments",
+    "resource changes are validated, require review, and cannot delete an in-use resource",
+    "undoing a cross-scenario import restores the overwritten destination workspace",
+    "separate browser profiles see only their own locally saved solve history",
+    "backup restores tasks on another browser and survives reload without accepting imported solver results",
+    "invalid backup is rejected without modifying existing browser content",
+    "history-only storage failure stays visible even when workspace autosave succeeds",
+    "mobile workspace actions remain visible without page overflow"
+  ],
+  "solves": [
+    {
+      "status": "FEASIBLE",
+      "scheduled": 35,
+      "solve_time": 4.001,
+      "hard_violations": 0
+    },
+    {
+      "status": "OPTIMAL",
+      "scheduled": 1,
+      "solve_time": 0.024,
+      "hard_violations": 0
+    },
+    {
+      "status": "FEASIBLE",
+      "scheduled": 11,
+      "solve_time": 4.003,
+      "hard_violations": 0
+    }
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "version": "0.1.9"
+}

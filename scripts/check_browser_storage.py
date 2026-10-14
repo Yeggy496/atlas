@@ -135,6 +135,7 @@ with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_
     if not args.smoke:
         with page.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=120000):
             page.get_by_role('button', name='恢复预置方案', exact=True).click()
+            page.get_by_role('dialog').get_by_role('button', name='确认恢复', exact=True).click()
         wait_saved(page, 'data.workspaces.academic.input !== "本班课程的本地输入草稿"')
         assert stored(page)['workspaces']['life'] == life_solved
         report['checks'].append('reset replaces only the current scenario')

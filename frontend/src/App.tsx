@@ -1,5 +1,8 @@
 import { InputPanel } from "./InputPanel";
 import { ResultPanel } from "./ResultPanel";
+import { BusyStatus } from "./BusyStatus";
+import { PlanChanges, type PlanBaseline } from "./PlanChanges";
+import { ResourceManager } from "./ResourceManager";
 import { useEffect, useRef, useState } from "react";
 import {
   Activity as ActivityIcon,
@@ -43,13 +46,13 @@ import {
 import { api, exportPlan as exportPlanRequest, readResponse } from "./api";
 import { Calendar } from "./Calendar";
 import { ActivityEditor, ConstraintEditor, Dialog } from "./Editors";
-import { readLocalWorkspaces, writeLocalWorkspaces, type LocalWorkspace } from "./localWorkspace";
+import { readLocalWorkspaces, writeLocalWorkspaces, readWorkspaceBackup, type LocalWorkspace } from "./localWorkspace";
+import { readLocalHistory, saveLocalRun, type LocalRun } from "./localHistory";
 import {
   type Activity,
   type Assignment,
   type Constraint,
   type Explanation,
-  type HistoryRun,
   type Mode,
   type Problem,
   type Result,
@@ -70,12 +73,19 @@ const SCENARIO_ICONS: Record<Scenario, typeof CalendarDays> = {
   production: Factory,
 };
 
+function mondayOf(date: string): string {
+  const day = new Date(`${date}T12:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - (day.getUTCDay() + 6) % 7);
+  return day.toISOString().slice(0, 10);
+}
+
 export default function App() {
   const [local] = useState(readLocalWorkspaces);
   const initial = local.store.workspaces[local.store.active_scenario];
   const localStore = useRef(local.store);
   const [localReady, setLocalReady] = useState(!!initial);
   const [saveWarning, setSaveWarning] = useState("");
+  const [historyWarning, setHistoryWarning] = useState("");
   const [locallySaved, setLocallySaved] = useState(!!initial);
   const [problem, setProblem] = useState<Problem | null>(initial?.problem ?? null),
     [result, setResult] = useState<Result | null>(initial?.result ?? null);
@@ -93,6 +103,7 @@ export default function App() {
   const [input, setInput] = useState(initial?.input ?? SCENARIOS[local.store.active_scenario].input),
     [provider, setProvider] = useState("demo");
   const [version, setVersion] = useState("");
+  const [connected, setConnected] = useState(false);
   const [reviewed, setReviewed] = useState(initial?.reviewed ?? true),
     [summary, setSummary] = useState<string[]>(initial?.summary ?? []),
     [warnings, setWarnings] = useState<string[]>(initial?.warnings ?? []);
@@ -101,7 +112,11 @@ export default function App() {
     ),
     [view, setView] = useState<"calendar" | "resources">(initial?.view ?? "calendar");
   const [page, setPage] = useState<"workspace" | "history">("workspace"),
-    [history, setHistory] = useState<HistoryRun[]>([]);
+    [history, setHistory] = useState<LocalRun[]>([]);
+  const [resourcesOpen, setResourcesOpen] = useState(false);
+  const [confirmation, setConfirmation] = useState<"preset" | "blank" | LocalWorkspace | null>(null);
+  const [undo, setUndo] = useState<{ restore: LocalWorkspace; removeScenario?: Scenario } | null>(null);
+  const [baseline, setBaseline] = useState<PlanBaseline | null>(null);
   const [constraintEditor, setConstraintEditor] = useState<
       Constraint | "new" | null
     >(null),
@@ -112,8 +127,10 @@ export default function App() {
     [explainBusy, setExplainBusy] = useState(false),
     [help, setHelp] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null),
+    backupFileRef = useRef<HTMLInputElement>(null),
     textFileRef = useRef<HTMLInputElement>(null),
     previous = useRef<Assignment[]>(initial?.previous ?? []),
+    previousProblem = useRef<Problem | null>(initial?.previousProblem ?? initial?.problem ?? null),
     loadCounter = useRef(0);
 
   const snapshot = useRef<LocalWorkspace | null>(null);
@@ -121,6 +138,7 @@ export default function App() {
   snapshot.current = problem && problem.scenario === scenario ? {
     problem, result, previous: previous.current, input, mode, customWeights,
     reviewed, summary, warnings, inputTab, view,
+    ...(previousProblem.current ? { previousProblem: previousProblem.current } : {}),
   } : null;
   canSave.current = localReady;
 
@@ -143,6 +161,7 @@ export default function App() {
     setProblem(saved.problem);
     setResult(saved.result);
     previous.current = saved.previous;
+    previousProblem.current = saved.previousProblem ?? saved.problem;
     setScenario(saved.problem.scenario);
     setInput(saved.input);
     setMode(saved.mode);
@@ -153,6 +172,34 @@ export default function App() {
     setInputTab(saved.inputTab);
     setView(saved.view);
     setLocalReady(true);
+    setBaseline(null);
+  }
+  function rememberRun(p: Problem, r: Result, selectedMode: Mode = mode, weights = customWeights) {
+    const saved = snapshot.current;
+    if (!saved) return;
+    const warning = saveLocalRun({ ...saved, problem: p, result: r, previous: r.assignments.length ? r.assignments : saved.previous,
+      previousProblem: r.assignments.length ? p : saved.previousProblem ?? saved.problem,
+      mode: selectedMode, customWeights: weights, reviewed: true });
+    setHistoryWarning(warning);
+  }
+  function rememberReplacement(target: Scenario) {
+    const current = snapshot.current;
+    const old = target === scenario ? current : readLocalWorkspaces().store.workspaces[target];
+    if (old) setUndo({ restore: old });
+    else if (current) setUndo({ restore: current, removeScenario: target });
+  }
+  function undoChange() {
+    if (!undo) return;
+    saveLocal();
+    if (undo.removeScenario) {
+      const store = readLocalWorkspaces().store;
+      delete store.workspaces[undo.removeScenario];
+      store.active_scenario = undo.restore.problem.scenario;
+      localStore.current = store;
+      setSaveWarning(writeLocalWorkspaces(store));
+    }
+    restoreLocal(undo.restore); setUndo(null); setError("");
+    setNotice("已撤销上一次内容修改。");
   }
   // Save edits, including unparsed text and unconfirmed drafts. Do not save a
   // half-switched template or overwrite another scenario's workspace.
@@ -171,6 +218,7 @@ export default function App() {
 
   async function load(s: Scenario, reset = false) {
     saveLocal();
+    if (!reset) setUndo(null);
     const version = ++loadCounter.current;
     setSelected(null);
     setPage("workspace");
@@ -201,6 +249,12 @@ export default function App() {
       setMode("balanced");
       setResult(r);
       previous.current = r.assignments;
+      previousProblem.current = p;
+      // Template loading updates React state asynchronously, so use its actual data.
+      const warning = saveLocalRun({ problem: p, result: r, previous: r.assignments,
+        input: SCENARIOS[s].input, mode: "balanced", customWeights: null,
+        reviewed: true, summary: [], warnings: [], inputTab: "constraints", view: "calendar" });
+      setHistoryWarning(warning);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -209,7 +263,7 @@ export default function App() {
   }
   useEffect(() => {
     api<{ provider: string; version: string }>("/health")
-      .then((x) => { setProvider(x.provider); setVersion(x.version); })
+      .then((x) => { setProvider(x.provider); setVersion(x.version); setConnected(true); })
       .catch(() => setError("暂时无法连接后端，请确认服务已启动。"));
     // Weight dimensions come from the solver so the UI never hard-codes them.
     api<WeightsMeta>("/weights")
@@ -259,11 +313,13 @@ export default function App() {
     };
   }, [selected, problem, result]);
   function draft(p: Problem | ((current: Problem | null) => Problem | null)) {
+    if (snapshot.current) setUndo({ restore: snapshot.current });
     setProblem(p);
     setResult(null);
     setReviewed(false);
     setError("");
     setSelected(null);
+    setBaseline(null);
   }
   async function optimize(
     selectedMode: Mode = mode,
@@ -273,13 +329,14 @@ export default function App() {
     // custom weights) must pass it here instead of relying on the closure.
     weightsOverride?: Record<string, number> | null,
   ) {
-    if (!problem || !reviewed) return;
+    if (!problem || !reviewed || !problem.activities.length) return;
     const effectiveWeights =
       weightsOverride === undefined ? customWeights : weightsOverride;
     setBusy("正在组合优化");
     setError("");
     setSelected(null);
     try {
+      const before = { problem: previousProblem.current ?? problem, assignments: fresh ? [] : [...previous.current] };
       const r = await api<Result>("/solve", {
         problem,
         reviewed,
@@ -288,7 +345,9 @@ export default function App() {
         ...(effectiveWeights ? { weights: effectiveWeights } : {}),
       });
       setResult(r);
-      if (r.assignments.length) previous.current = r.assignments;
+      setBaseline(before);
+      rememberRun(problem, r, selectedMode, effectiveWeights);
+      if (r.assignments.length) { previous.current = r.assignments; previousProblem.current = problem; }
       if (r.status === "INFEASIBLE")
         setNotice("检测到约束冲突，已生成诊断结果。");
       else if (r.status === "UNKNOWN")
@@ -396,9 +455,13 @@ export default function App() {
       });
       setProblem(data.problem);
       setResult(data.result);
+      setBaseline({ problem: previousProblem.current ?? problem, assignments: [...previous.current] });
+      rememberRun(data.problem, data.result);
       setReviewed(true);
-      if (data.result.assignments.length)
+      if (data.result.assignments.length) {
         previous.current = data.result.assignments;
+        previousProblem.current = data.problem;
+      }
       setNotice("已应用你选择的约束放宽方案并重新求解。");
     } catch (e) {
       setError((e as Error).message);
@@ -407,16 +470,57 @@ export default function App() {
     }
   }
   async function openHistory() {
-    setBusy("正在读取历史");
     setError("");
+    saveLocal();
+    setHistory(readLocalHistory());
+    setPage("history");
+  }
+  function backupWorkspace() {
+    if (!snapshot.current) return;
+    const url = URL.createObjectURL(new Blob([JSON.stringify({ format: "atlas-workspace", version: 1,
+      saved_at: new Date().toISOString(), workspace: snapshot.current }, null, 2)], { type: "application/json" }));
+    const a = document.createElement("a"); a.href = url;
+    a.download = `atlas-workspace-${scenario}-${problem?.week_start}.json`; a.click();
+    URL.revokeObjectURL(url);
+    setNotice("已下载工作空间备份，可在另一台电脑恢复。");
+  }
+  async function importBackup(file: File) {
+    setError(""); setBusy("正在检查备份");
     try {
-      setHistory(await api<HistoryRun[]>("/history"));
-      setPage("history");
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy("");
+      if (file.size > 2_000_000) throw new Error("备份文件不能超过 2 MB。");
+      const saved = readWorkspaceBackup(await file.text());
+      await api("/constraints/validate", saved.problem);
+      setConfirmation(saved);
+    } catch (e) { setError((e as Error).message); }
+    finally { setBusy(""); if (backupFileRef.current) backupFileRef.current.value = ""; }
+  }
+  async function confirmReplacement() {
+    if (!confirmation || !problem) return;
+    const action = confirmation; setConfirmation(null);
+    rememberReplacement(typeof action === "string" ? scenario : action.problem.scenario);
+    if (action === "preset") { await load(scenario, true); return; }
+    saveLocal(); setPage("workspace"); setSelected(null); setError("");
+    if (action === "blank") {
+      restoreLocal({ problem: { ...problem, name: `我的${SCENARIOS[scenario].title}`,
+        week_start: mondayOf(new Date().toLocaleDateString("sv-SE")), activities: [], constraints: [] },
+        result: null, previous: [], input: "", mode: "balanced", customWeights: null,
+        reviewed: false, summary: [], warnings: [], inputTab: "activities", view: "calendar" });
+      setNotice("已新建自己的计划。添加活动或描述需求，然后确认并生成安排。");
+    } else {
+      // A downloaded JSON cannot establish solver correctness or user approval.
+      restoreLocal({ ...action, result: null, reviewed: false,
+        previous: action.result?.assignments ?? action.previous });
+      setSummary(["已恢复备份中的任务与约束，请检查后确认并重新求解。"]);
+      setNotice("备份已恢复；确认后重新生成合法计划。");
     }
+  }
+  async function changeWeek(value: string) {
+    if (!problem || !value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return;
+    const next = mondayOf(value);
+    if (next === problem.week_start) return;
+    const p = { ...problem, week_start: next };
+    try { await api("/constraints/validate", p); draft(p); setNotice("已切换到所选日期所在周，请确认并重新生成计划。"); }
+    catch (e) { setError((e as Error).message); }
   }
   function deleteConstraint(c: Constraint) {
     if (!problem) return;
@@ -427,13 +531,17 @@ export default function App() {
   }
   function deleteActivity(a: Activity) {
     // Group deletions are batched by React: apply each removal to the latest draft.
-    draft((current) => current ? {
-      ...current,
-      activities: current.activities.filter((x) => x.id !== a.id),
-      constraints: current.constraints.filter(
-        (c) => c.target !== a.id && c.other !== a.id,
-      ),
-    } : current);
+    draft((current) => {
+      if (!current) return current;
+      let activities = current.activities.filter((x) => x.id !== a.id);
+      const groups = new Map<string, Activity[]>();
+      activities.forEach((x) => { if (x.group) groups.set(x.group, [...(groups.get(x.group) ?? []), x]); });
+      groups.forEach((items) => items.sort((x, y) => x.op_index - y.op_index));
+      activities = activities.map((x) => x.group ? { ...x, op_index: groups.get(x.group)!.findIndex((item) => item.id === x.id) } : x);
+      const targets = new Set(["*", ...activities.map((x) => x.id), ...activities.map((x) => x.category), ...current.resources.map((x) => x.id)]);
+      return { ...current, activities, constraints: current.constraints.filter((c) =>
+        targets.has(c.target) && (c.other === null || activities.some((x) => x.id === c.other))) };
+    });
   }
   function exportPlan(format: "json" | "xlsx" | "pdf" = "json") {
     if (!problem || !result) return;
@@ -565,9 +673,9 @@ export default function App() {
             <strong>{page === "history" ? "求解历史" : title.title}</strong>
           </div>
           <div className="topbar-right">
-            <span className="engine-health">
+            <span className={`engine-health ${connected ? "" : "disconnected"}`}>
               <span />
-              CP-SAT 引擎
+              {connected ? "CP-SAT 引擎已连接" : "正在连接服务"}
             </span>
             <span className="provider-badge">{provider === "demo" ? "规则解析" : provider === "deepseek" ? "DeepSeek" : "OpenAI"}</span>
             <button
@@ -611,7 +719,7 @@ export default function App() {
               </h1>
               <p>
                 {page === "history"
-                  ? "查看历史计划，恢复任务、约束与安排。"
+                  ? "仅显示当前浏览器保存的最近 12 次求解，可恢复任务、约束与安排。"
                   : title.description}
               </p>
             </div>
@@ -619,7 +727,7 @@ export default function App() {
               <button
                 className="secondary"
                 disabled={!!busy}
-                onClick={() => void load(scenario, true)}
+                onClick={() => setConfirmation("preset")}
               >
                 <RotateCcw size={15} />
                 恢复预置方案
@@ -634,6 +742,27 @@ export default function App() {
               </button>
             </div>
           </section>
+          {page === "workspace" && problem && <>
+            <div className="workspace-tools">
+              <label>所在周 <input aria-label="选择计划所在周" type="date" value={problem.week_start} disabled={!!busy}
+                onChange={(e) => void changeWeek(e.target.value)} /></label>
+              <div>
+                <button disabled={!!busy} onClick={() => setConfirmation("blank")}><Plus size={14}/>新建自己的计划</button>
+                <button disabled={!!busy} onClick={() => setResourcesOpen(true)}><Settings2 size={14}/>管理资源</button>
+                <button disabled={!!busy} onClick={backupWorkspace}><Download size={14}/>备份工作空间</button>
+                <button disabled={!!busy} onClick={() => backupFileRef.current?.click()}><Upload size={14}/>恢复备份</button>
+              </div>
+            </div>
+            <div className="workflow-progress" aria-label="计划生成步骤">
+              <span className={problem.activities.length ? "done" : "current"}><i>1</i>添加任务与需求</span>
+              <ChevronRight size={14}/><span className={reviewed ? "done" : "current"}><i>2</i>{reviewed ? "约束已确认" : "检查并确认约束"}</span>
+              <ChevronRight size={14}/><span className={result?.assignments.length ? "done" : ""}><i>3</i>生成与调整计划</span>
+              {undo && <button disabled={!!busy} onClick={undoChange}><RotateCcw size={13}/>撤销修改</button>}
+            </div>
+          </>}
+          <input ref={backupFileRef} type="file" accept=".json" aria-label="选择工作空间备份" hidden
+            onChange={(e) => { if (e.target.files?.[0]) void importBackup(e.target.files[0]); }} />
+          <BusyStatus busy={busy}/>
           {error && !constraintEditor && !addingActivity && !editingActivity && (
             <div className="message error" role="alert">
               <AlertTriangle size={17} />
@@ -649,7 +778,8 @@ export default function App() {
               <span>{saveWarning}</span>
             </div>
           )}
-          {notice && (
+          {historyWarning && <div className="message error history-save-warning" role="alert"><AlertTriangle size={17}/><span>{historyWarning}</span></div>}
+          {notice && !constraintEditor && !addingActivity && !editingActivity && !resourcesOpen && !help && !confirmation && !selected && (
             <div className="toast" role="status">
               <CheckCircle2 size={17} />
               {notice}
@@ -670,42 +800,35 @@ export default function App() {
               <p>生成第一份计划后，求解记录会保存在这里。</p>
                 </div>
               ) : (
-                history.map((h) => (
+                history.map((h) => h.workspace.result && (
                   <button
                     className="history-row"
                     key={h.id}
                     disabled={!!busy}
                     onClick={() => {
                       saveLocal();
-                      setProblem(h.problem);
-                      setResult(h.result);
-                      previous.current = h.result.assignments;
-                      setScenario(h.problem.scenario);
-                      setInput(SCENARIOS[h.problem.scenario].input);
-                      setReviewed(true);
-                      setSummary([]);
-                      setWarnings([]);
+                      rememberReplacement(h.workspace.problem.scenario);
+                      restoreLocal(h.workspace);
                       setPage("workspace");
-                      setMode("balanced");
-                      setCustomWeights(h.result.objective?.weights ?? null);
+                      setNotice("已恢复此浏览器中的历史计划。");
                     }}
                   >
                     <span className="history-icon">
                       <CalendarDays size={20} />
                     </span>
                     <div>
-                      <strong>{h.problem.name}</strong>
+                      <strong>{h.workspace.problem.name}</strong>
                       <small>
                         {new Date(h.created_at).toLocaleString("zh-CN")} ·{" "}
-                        {h.result.metrics.activities} 项活动
+                        {h.workspace.result.metrics.activities} 项活动
                       </small>
                     </div>
                     <span
-                      className={`status-pill ${h.result.status === "INFEASIBLE" ? "bad" : ""}`}
+                      className={`status-pill ${h.workspace.result.status === "INFEASIBLE" ? "bad" : ""}`}
                     >
-                      {h.result.status}
+                      {h.workspace.result.status}
                     </span>
-                    <span>{h.result.metrics.solve_time}s</span>
+                    <span>{h.workspace.result.metrics.solve_time}s</span>
                     <ChevronRight size={18} />
                   </button>
                 ))
@@ -743,7 +866,7 @@ export default function App() {
                     <Clock3 size={19} />
                   </span>
                   <div>
-                    <span>本周任务时长</span>
+                    <span>必做任务时长</span>
                     <strong>
                       {totalHours}
                       <small>小时 · 不含睡眠</small>
@@ -804,6 +927,8 @@ export default function App() {
                   textFileRef={textFileRef}
                   importText={importText}
                 />
+                <div className="result-column">
+                {baseline && problem && result && <PlanChanges before={baseline} problem={problem} result={result}/>}
                 <ResultPanel
                   problem={problem}
                   result={result}
@@ -815,6 +940,7 @@ export default function App() {
                   repair={repair}
                   setSelected={setSelected}
                 />
+                </div>
               </div>
               <footer className="workspace-footer">
                 <span>
@@ -834,6 +960,22 @@ export default function App() {
           )}
         </main>
       </div>
+      {problem && resourcesOpen && <Dialog title="管理资源" onClose={() => { if (!busy) setResourcesOpen(false); }}>
+        <ResourceManager problem={problem} busy={!!busy} onSave={async (resources) => {
+          const p = { ...problem, resources };
+          await api("/constraints/validate", p); draft(p); setResourcesOpen(false);
+          setNotice("资源已更新，请确认约束并重新生成计划。");
+        }}/>
+      </Dialog>}
+      {confirmation && <Dialog title={confirmation === "preset" ? "恢复预置方案？" : confirmation === "blank" ? "新建自己的计划？" : "恢复工作空间备份？"}
+        onClose={() => setConfirmation(null)}>
+        <div className="replacement-content">
+          <p>{confirmation === "preset" ? "当前场景的任务、输入与计划将替换为预置内容。其他场景保持原样。" : confirmation === "blank" ? "清空当前场景的活动与约束，保留资源，开始安排自己的任务。" : "将打开备份对应的场景，恢复任务、约束和输入。请重新确认并求解，确保计划有效。"}</p>
+          <div className="form-note">替换前可取消并下载备份。完成后可点击“撤销修改”恢复上一次内容。</div>
+          <div className="replacement-actions"><button className="secondary" onClick={() => setConfirmation(null)}>取消</button>
+            <button className="primary" onClick={() => void confirmReplacement()}>确认{confirmation === "blank" ? "新建" : "恢复"}</button></div>
+        </div>
+      </Dialog>}
       {problem && constraintEditor && (
         <ConstraintEditor
           problem={problem}
@@ -1004,11 +1146,12 @@ export default function App() {
             <div className="form-note">
               工作内容自动保存在当前浏览器，刷新、重新打开及切换场景时会恢复上次内容。
               点击“恢复预置方案”只会替换当前场景的内容。不同电脑或浏览器各自保存，不会自动同步；清除网站数据或结束无痕浏览会丢失本地保存。
+              使用“备份工作空间”下载 JSON 文件，在其他电脑点击“恢复备份”即可继续编辑。求解历史仅保存在此浏览器；任务与约束会提交服务器求解，使用 AI 识别时也会提交给模型服务。
             </div>
             <ol>
               <li>
                 <strong>选择一个场景</strong>
-                <p>选择需要安排的场景，从预置方案开始，或导入自己的任务。</p>
+                <p>从预置方案了解操作，或点击“新建自己的计划”。选择所在周，添加活动；教师、教室、设备等信息可在“管理资源”修改。</p>
               </li>
               <li>
                 <strong>描述安排或导入文件</strong>

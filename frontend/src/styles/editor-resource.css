@@ -1,0 +1,132 @@
+.editor-resource-settings {
+  margin: 10px 0 18px;
+  border-top: 1px solid #e9edf4;
+  border-bottom: 1px solid #e9edf4;
+  color: #6d819f;
+}
+.editor-resource-settings > summary {
+  padding: 14px 2px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.editor-resource-settings > summary > small {
+  display: block;
+  padding-left: 15px;
+  margin-top: 5px;
+  font-size: 10px;
+  color: #8596af;
+  line-height: 1.7;
+}
+.editor-resource-body {
+  padding-bottom: 8px;
+}
+.editor-resource-group {
+  border: 0;
+  padding: 0;
+  margin: 0 0 17px;
+  min-width: 0;
+}
+.editor-resource-group > legend {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0;
+  color: #526d92;
+}
+.editor-resource-group > p {
+  font-size: 10px;
+  line-height: 1.8;
+  color: #8597b1;
+  margin: 6px 0 10px;
+}
+.editor-resource-choice {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #eef2f8;
+}
+.editor-resource-choice > label:first-child,
+.editor-room-choice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #627c9f;
+}
+.editor-resource-choice input[type="checkbox"],
+.editor-room-choice input,
+.editor-day-options input {
+  accent-color: #365bd6;
+  flex-shrink: 0;
+}
+.editor-resource-choice > label:first-child > span,
+.editor-room-choice > span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.editor-resource-choice small,
+.editor-room-choice small {
+  display: block;
+  font-size: 9px;
+  color: #95a4bb;
+}
+.editor-resource-choice .editor-demand {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  font-size: 10px;
+  color: #8a9ab2;
+}
+.editor-demand > span {
+  white-space: nowrap;
+}
+.modal .editor-resource-choice .editor-demand input {
+  width: 57px;
+  padding: 7px;
+  margin: 0;
+}
+.editor-room-choice {
+  padding: 8px 0;
+}
+.editor-resource-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.editor-resource-grid > label,
+.editor-custom-room {
+  font-size: 11px;
+  color: #7a8da8;
+  min-width: 0;
+}
+.editor-custom-room {
+  display: block;
+  margin-top: 12px;
+}
+.editor-day-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin-top: 14px;
+}
+.editor-day-options > label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: #748bab;
+  font-size: 10px;
+}
+@media (max-width: 440px) {
+  .editor-resource-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .editor-resource-choice {
+    gap: 6px;
+  }
+}

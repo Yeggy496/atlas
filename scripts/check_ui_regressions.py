@@ -140,12 +140,19 @@ with sync_playwright() as p:
         assert response.ok, response.text()
         precise_result = response.json()
         assert precise_result['status'] in ['FEASIBLE', 'OPTIMAL']
-        with page.expect_response(lambda r: r.url.endswith('/api/history')) as pending:
+        def restore_fixture(problem, result):
+            # A real API solve is stored in this browser, rather than relying on
+            # the formerly public/shared server history.
+            page.evaluate('''({problem, result}) => {
+                const workspace = {...JSON.parse(localStorage.getItem('atlas.workspace.v1')).workspaces.life,
+                    problem, result, previous: result.assignments, reviewed: true};
+                localStorage.setItem('atlas.history.v1', JSON.stringify([{id: result.run_id,
+                    created_at: new Date().toISOString(), workspace}]));
+            }''', {'problem': problem, 'result': result})
             page.get_by_role('button', name='求解历史', exact=True).click()
-        rows = pending.value.json()
-        index = next(i for i, row in enumerate(rows) if row['id'] == precise_result['run_id'])
-        expect(page.locator('.history-row')).to_have_count(len(rows))
-        page.locator('.history-row').nth(index).click()
+            expect(page.locator('.history-row')).to_have_count(1)
+            page.locator('.history-row').first.click()
+        restore_fixture(template, precise_result)
         card = page.locator('.constraint-card').filter(has_text=precise_deadline['label'])
         card.get_by_role('button', name='编辑 ' + precise_deadline['label'], exact=True).click()
         deadline_dialog = page.get_by_role('dialog', name='编辑约束', exact=True)
@@ -163,12 +170,7 @@ with sync_playwright() as p:
             assert response.ok, response.text()
             result = response.json()
             assert result['status'] in ['FEASIBLE', 'OPTIMAL'] and result['metrics']['hard_violations'] == 0
-            with page.expect_response(lambda r: r.url.endswith('/api/history')) as pending:
-                page.get_by_role('button', name='求解历史', exact=True).click()
-            rows = pending.value.json()
-            index = next(i for i, row in enumerate(rows) if row['id'] == result['run_id'])
-            expect(page.locator('.history-row')).to_have_count(len(rows))
-            page.locator('.history-row').nth(index).click()
+            restore_fixture(template, result)
             expect(page.locator('.sleep-banner')).to_contain_text('7–7.5 小时 / 段' if mixed else '每段 7.5 小时')
             if mixed:
                 expect(page.locator('.sleep-banner')).to_contain_text('时间见全天日历')

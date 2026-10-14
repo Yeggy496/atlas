@@ -1,0 +1,17 @@
+{
+  "url": "http://127.0.0.1:8019",
+  "checks": [
+    "mobile toast stays within viewport during its entry animation",
+    "switching to robust mode sends the existing schedule and enables stability",
+    "stability slider matches the real 1000 preset and editing weights does not claim they are applied",
+    "blank task name error is visible in its dialog and unreviewed drafts cannot apply weights",
+    "real server validation error is visible in dialog and can be corrected successfully",
+    "constraint type switches send the target, day and deadline displayed in the form",
+    "meeting and production legend colors match actual calendar events",
+    "editing an existing midday deadline displays its exact stored time",
+    "sleep banner preserves half-hour precision and reports varying durations truthfully"
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "robust_changed": 0
+}

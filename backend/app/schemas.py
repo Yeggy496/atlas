@@ -1,6 +1,7 @@
 """The shared representation consumed by all scenario adapters and the solver."""
+from datetime import date
 from typing import Literal
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 Scenario = Literal['life', 'academic', 'lab', 'meeting', 'production']
 ConstraintType = Literal['fixed_time', 'time_window', 'unavailable', 'preferred_window', 'deadline', 'precedence', 'daily_limit', 'min_gap', 'consecutive']
@@ -81,6 +82,19 @@ class Problem(BaseModel):
     resources: list[Resource] = Field(max_length=50)
     constraints: list[Constraint] = Field(default_factory=list, max_length=200)
 
+    @field_validator('week_start')
+    @classmethod
+    def validate_week_start(cls, value):
+        try:
+            start = date.fromisoformat(value)
+        except ValueError as exc:
+            raise ValueError('周起始日期须为有效的 YYYY-MM-DD 日期。') from exc
+        if start.isoformat() != value:
+            raise ValueError('周起始日期须使用 YYYY-MM-DD 格式。')
+        if start.weekday() != 0:
+            raise ValueError('周计划从周一开始，请选择周一的日期。')
+        return value
+
     @model_validator(mode='after')
     def validate_references(self):
         acts = {a.id for a in self.activities}
@@ -112,9 +126,15 @@ class Problem(BaseModel):
 
 class Assignment(BaseModel):
     activity_id: str
-    start: int
-    end: int
+    start: int = Field(ge=0, le=335)
+    end: int = Field(ge=1, le=336)
     room_id: str | None = None
+
+    @model_validator(mode='after')
+    def validate_interval(self):
+        if self.start >= self.end:
+            raise ValueError('安排的结束时间必须晚于开始时间。')
+        return self
 
 
 class SolveRequest(BaseModel):

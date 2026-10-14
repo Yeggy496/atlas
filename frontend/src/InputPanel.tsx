@@ -238,6 +238,9 @@ export function InputPanel({
         </button>
       </div>
       <div className="constraint-list">
+        {problem && !problem.activities.length && <div className="start-plan-note">
+          还没有活动。点击上方“添加活动”，或描述本周需求后点击“识别约束”。
+        </div>}
         {inputTab === "constraints"
           ? problem?.constraints.map((c) => (
               <article className="constraint-card" key={c.id}>
@@ -391,7 +394,7 @@ export function InputPanel({
           mode={mode}
           weights={customWeights}
           appliedWeights={appliedWeights}
-          reviewed={reviewed}
+          reviewed={reviewed && !!problem?.activities.length}
           busy={!!busy}
           onChange={setCustomWeights}
           onApply={(override) =>
@@ -410,7 +413,7 @@ export function InputPanel({
         <button
           className="optimize-button"
           onClick={() => void optimize()}
-          disabled={!!busy || !reviewed || !problem}
+          disabled={!!busy || !reviewed || !problem?.activities.length}
         >
           {busy ? (
             <>

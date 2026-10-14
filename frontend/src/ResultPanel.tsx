@@ -120,7 +120,7 @@ export function ResultPanel({
               <FileSpreadsheet size={17} />
             </button>
             <button
-              title="导出 PDF（英文摘要版，中文请用 Excel）"
+              title="导出 PDF（中文计划）"
               aria-label="导出 PDF"
               className="icon-button"
               disabled={!result?.assignments.length}
@@ -154,7 +154,7 @@ export function ResultPanel({
             <Clock3 size={15} />
           )}
           <strong>
-            {busy ? "求解处理中" : (result?.status ?? "等待确认")}
+            {busy ? busy : (result?.status ?? "等待确认")}
           </strong>
           {metric?.scheduled !== undefined && (
             <span>{metric.scheduled} 项活动已安排</span>

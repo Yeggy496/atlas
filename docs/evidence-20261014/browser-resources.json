@@ -1,0 +1,45 @@
+{
+  "url": "http://127.0.0.1:8019",
+  "started_at": "2026-10-14T00:27:22.608465+00:00",
+  "checks": [
+    "new course stores class + teacher, candidate rooms, seats, room type and weekday time window through real validation",
+    "editing without touching advanced settings preserves every existing activity field including multiple resources and room choices",
+    "CP-SAT returns a checked legal course schedule and assigns the matching lecture room",
+    "resources referenced by activities and candidate rooms cannot be removed or changed away from room type",
+    "blank resource names and zero quantities are blocked inline without reaching the backend; valid additions are persisted",
+    "unused resources can be removed and the real validated problem no longer contains them",
+    "a resource referenced only by a constraint is protected and its real unavailable time is displayed",
+    "laboratory task demands two centrifuges and a matching lab; quantity survives editing and CP-SAT independently validates its schedule",
+    "invalid windows, room requirements without a candidate, and zero equipment demand are rejected with actionable inline errors",
+    "resource and activity dialogs fit a 390 px phone with reachable save buttons and no horizontal overflow"
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "status": "passed",
+  "version": "0.1.9",
+  "academic_result": {
+    "status": "FEASIBLE",
+    "hard_violations": 0,
+    "scheduled": 12,
+    "new_course_room": "room1"
+  },
+  "lab_result": {
+    "status": "OPTIMAL",
+    "hard_violations": 0,
+    "scheduled": 7,
+    "new_experiment_room": "lab2"
+  },
+  "finished_at": "2026-10-14T00:27:44.822981+00:00",
+  "final_visual_checks": {
+    "bundle": "index-CVx2KssT.js",
+    "quantity_input_width": "57px",
+    "quantity_label_white_space": "nowrap",
+    "search_input_padding_left": "32px",
+    "mobile_horizontal_overflow": false,
+    "modal_toast_count": 0,
+    "screenshots": [
+      "resource-activity-mobile-20261014.png",
+      "resource-manager-mobile-20261014.png"
+    ]
+  }
+}

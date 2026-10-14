@@ -8,11 +8,11 @@ It only runs when ATLAS_LLM_LIVE_TEST=1 and a key is present, so the offline
 suite (and CI) stays green without credentials.
 
 Run, for example:
-    LLM_PROVIDER=openai
-    OPENAI_BASE_URL=https://myai.bupt.edu.cn/llm-gw/v1
-    OPENAI_API_KEY=...
-    OPENAI_MODEL=deepseek-v4-flash
-    OPENAI_TIMEOUT=300            # slow gateways need more than the 35s default
+    LLM_PROVIDER=deepseek
+    DEEPSEEK_BASE_URL=https://api.deepseek.com
+    DEEPSEEK_API_KEY=...
+    DEEPSEEK_MODEL=deepseek-flash
+    DEEPSEEK_TIMEOUT=90
     ATLAS_LLM_LIVE_TEST=1
     python -m pytest backend/tests/test_llm_live.py -q
 """

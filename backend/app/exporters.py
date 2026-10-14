@@ -1,13 +1,11 @@
-"""Export a solved schedule to XLSX or PDF (MASTER_SPEC §25 P2).
+"""Export the displayed schedule to XLSX or a readable Chinese PDF.
 
 Both exporters read the *same* solved result the UI already shows, so an export
 can never disagree with what the user saw. Nothing here re-solves or re-orders
 assignments.
 
-XLSX uses openpyxl (already a declared dependency for import). PDF is written
-with the standard library only: the spec only lists ``pypdf`` for parsing, and
-adding a heavyweight layout engine for a one-page summary would be exactly the
-"over-development" §26 warns against.
+XLSX uses openpyxl. PDF uses ReportLab's built-in Chinese CID font, avoiding
+external font downloads and keeping the same schedule in both formats.
 """
 from __future__ import annotations
 
@@ -28,8 +26,12 @@ def _slot_label(slot: int) -> str:
     return f'{DAY_NAMES[day % 7]} {hour:02d}:{half * 30:02d}'
 
 
-def _fmt_slot_time(slot: int) -> str:
+def _fmt_slot_time(slot: int, *, end: bool = False) -> str:
     _, within = divmod(int(slot), 48)
+    # An activity ending at the boundary belongs to the preceding day. Showing
+    # 00:00 beside its 23:00 start would look like a negative duration.
+    if end and int(slot) > 0 and within == 0:
+        return '24:00'
     hour, half = divmod(within, 2)
     return f'{hour:02d}:{half * 30:02d}'
 
@@ -133,7 +135,7 @@ def build_xlsx(problem: Problem, result: dict) -> bytes:
             r['priority'],
             DAY_NAMES[r['day']] if r['day'] is not None else '-',
             _fmt_slot_time(r['start']) if r['start'] is not None else '未安排',
-            _fmt_slot_time(r['end']) if r['end'] is not None else '-',
+            _fmt_slot_time(r['end'], end=True) if r['end'] is not None else '-',
             round(r['duration'] / 2, 1),
             r['resources'],
             '是' if r['optional'] else '否',
@@ -179,6 +181,15 @@ def build_xlsx(problem: Problem, result: dict) -> bytes:
     ws3.column_dimensions['A'].width = 18
     ws3.column_dimensions['B'].width = 30
 
+    # Excel must treat user-supplied names and descriptions as text, even when
+    # they start with '='. Setting the cell type preserves the exact displayed
+    # value without inserting a visible apostrophe or exporting a formula.
+    for sheet in wb:
+        for row in sheet:
+            for cell in row:
+                if isinstance(cell.value, str):
+                    cell.data_type = 's'
+
     buffer = io.BytesIO()
     wb.save(buffer)
     return buffer.getvalue()
@@ -201,121 +212,105 @@ def _cell_value(value):
 
 # ---------------------------------------------------------------------------- PDF
 
-# Deliberate constraint: the PDF is generated with the standard library and the
-# built-in Helvetica font only. CJK glyphs cannot be drawn without embedding a
-# ~10-20 MB font (or adding reportlab + pillow as new dependencies), and MASTER_SPEC
-# §26 forbids that kind of over-development for a one-page export. So the PDF is an
-# English/ASCII summary and the XLSX export carries the full Chinese schedule.
-# The UI states this next to the two export buttons.
-EN_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-
-
-def _pdf_escape(text: str) -> str:
-    return text.replace('\\', r'\\').replace('(', r'\(').replace(')', r'\)')
-
-
-def _ascii(text: str) -> str:
-    """Replace characters the built-in PDF fonts cannot draw with '?'."""
-    return ''.join(ch if 32 <= ord(ch) < 127 else '?' for ch in text)
-
-
 def build_pdf(problem: Problem, result: dict) -> bytes:
+    """A4 schedule with Chinese text, wrapping cells and repeated table headers."""
+    from xml.sax.saxutils import escape
+
+    from reportlab.lib import colors
+    from reportlab.lib.enums import TA_CENTER
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    font = 'STSong-Light'
+    if font not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(UnicodeCIDFont(font))
+
     rows = _rows(problem, result.get('assignments') or [])
     objective = result.get('objective') or {}
-    penalties = (objective.get('penalties') or {})
+    metrics = result.get('metrics') or {}
+    blue = colors.HexColor('#3158D5')
+    ink = colors.HexColor('#1E293B')
+    muted = colors.HexColor('#64748B')
+    border = colors.HexColor('#E2E8F0')
 
-    lines: list[tuple[int, str]] = []
-    lines.append((16, 'ATLAS-Sigma Weekly Schedule'))
-    lines.append((9, f'Problem  : {_ascii(problem.name)}'))
-    lines.append((9, f'Status   : {result.get("status", "-")}   '
-                    f'Objective: {objective.get("value", "-")}'))
-    lines.append((9, f'Scheduled: {len(rows)} / {len(problem.activities)} activities   '
-                    f'Resources: {len(problem.resources)}   Constraints: {len(problem.constraints)}'))
-    lines.append((9, '-' * 96))
-    lines.append((9, 'No   Task                          Day   Start  End    Hrs   Resources'))
-    lines.append((9, '-' * 96))
-    for i, r in enumerate(rows, start=1):
-        name = _ascii(r['name'])[:28].ljust(28)
-        day_en = EN_DAYS[r['day']] if r['day'] is not None else '--'
-        start = _fmt_slot_time(r['start']) if r['start'] is not None else '--:--'
-        end = _fmt_slot_time(r['end']) if r['end'] is not None else '--:--'
-        res = _ascii(r['resources'])[:20]
-        lines.append((9, f'{i:<4} {name} {day_en:<5} {start}  {end}  '
-                         f'{r["duration"] / 2:>4.1f}  {res}'))
-    lines.append((9, '-' * 96))
-    if penalties:
-        summary = '   '.join(f'{_ascii(k)}={v}' for k, v in penalties.items())
-        lines.append((8, f'Penalties: {summary[:96]}'))
-    lines.append((8, f'Generated by ATLAS-Sigma . {datetime.now().strftime("%Y-%m-%d %H:%M")}'))
-    lines.append((8, 'Note: PDF uses the built-in font and is ASCII-only. '
-                     'Use the XLSX export for the full Chinese schedule.'))
+    text_style = ParagraphStyle('schedule-text', fontName=font, fontSize=9,
+                                leading=13, textColor=ink, wordWrap='CJK')
+    heading_style = ParagraphStyle('schedule-title', parent=text_style,
+                                   fontSize=19, leading=26, textColor=blue)
+    small_style = ParagraphStyle('schedule-note', parent=text_style,
+                                 fontSize=8, leading=12, textColor=muted)
+    header_style = ParagraphStyle('schedule-header', parent=text_style,
+                                  textColor=colors.white, alignment=TA_CENTER)
 
-    return _pdf_from_lines(lines)
+    def para(value, style=text_style):
+        # Paragraph interprets XML-like markup. User text must stay literal.
+        text = ''.join(ch for ch in str(value) if ch >= ' ' or ch in '\n\t')
+        return Paragraph(escape(text).replace('\n', '<br/>'), style)
 
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=32, leftMargin=32,
+                            topMargin=32, bottomMargin=38,
+                            title=f'ATLAS-Sigma - {problem.name}', author='ATLAS-Sigma',
+                            # Repeated downloads of the same data are byte stable.
+                            invariant=1)
+    story = [para('ATLAS-Sigma 周计划', heading_style), Spacer(1, 6),
+             para(problem.name),
+             para(f'起始日期：{problem.week_start}　时间粒度：30 分钟', small_style),
+             Spacer(1, 14)]
+    status = result.get('status', '-')
+    summary = (f'求解状态：{status}　已安排：{len(rows)} / {len(problem.activities)} 项　'
+               f'资源：{len(problem.resources)}　显式约束：{len(problem.constraints)}')
+    story += [para(summary), Spacer(1, 5)]
+    details = []
+    if metrics.get('hard_violations') is not None:
+        details.append(f'硬约束违反：{metrics["hard_violations"]}')
+    if metrics.get('solve_time') is not None:
+        details.append(f'求解耗时：{metrics["solve_time"]} 秒')
+    if objective.get('value') is not None:
+        details.append(f'目标值：{objective["value"]}')
+    if details:
+        story += [para('　'.join(details), small_style), Spacer(1, 10)]
 
-def _pdf_from_lines(lines: list[tuple[int, str]]) -> bytes:
-    """Lay text lines out on A4 pages and emit a valid PDF byte string."""
-    page_w, page_h = 595, 842          # A4 in points
-    margin_x, top, bottom = 40, 800, 50
-    content_pages: list[bytes] = []
-    buffer: list[str] = []
-    y = top
+    columns = ['序号', '任务', '星期', '开始', '结束', '小时', '资源']
+    table_rows = [[para(label, header_style) for label in columns]]
+    for i, row in enumerate(rows, start=1):
+        table_rows.append([
+            para(i), para(row['name']),
+            para(DAY_NAMES[row['day']] if row['day'] is not None else '-'),
+            para(_fmt_slot_time(row['start']) if row['start'] is not None else '未安排'),
+            para(_fmt_slot_time(row['end'], end=True) if row['end'] is not None else '-'),
+            para(f'{row["duration"] / 2:g}'), para(row['resources']),
+        ])
+    if rows:
+        table = Table(table_rows, colWidths=[30, 155, 42, 44, 44, 35, 181],
+                      repeatRows=1, splitInRow=1, hAlign='LEFT')
+        # Column widths sum to the usable A4 width (531 points).
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), blue),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#F8FAFC')]),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('LINEBELOW', (0, 0), (-1, 0), 0.6, blue),
+            ('LINEBELOW', (0, 1), (-1, -1), 0.3, border),
+            ('LEFTPADDING', (0, 0), (-1, -1), 6),
+            ('RIGHTPADDING', (0, 0), (-1, -1), 6),
+            ('TOPPADDING', (0, 0), (-1, -1), 6),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ]))
+        story.append(table)
+    else:
+        story.append(para('此方案暂未安排任务。', small_style))
+    story += [Spacer(1, 12), para('导出内容与当前显示的求解结果一致；每日负载与完整求解指标可在 Excel 中查看。', small_style)]
 
-    def flush_page():
-        nonlocal buffer, y
-        if buffer:
-            content_pages.append('\n'.join(buffer).encode('latin-1', 'replace'))
-        buffer = []
-        y = top
+    def footer(canvas, document):
+        canvas.saveState()
+        canvas.setFont(font, 8)
+        canvas.setFillColor(muted)
+        canvas.drawString(32, 21, 'ATLAS-Sigma')
+        canvas.drawRightString(A4[0] - 32, 21, f'第 {document.page} 页')
+        canvas.restoreState()
 
-    for size, text in lines:
-        if y < bottom:
-            flush_page()
-        buffer.append(f'BT /F1 {size} Tf {margin_x} {y} Td ({_pdf_escape(text)}) Tj ET')
-        y -= size + 4
-    flush_page()
-    if not content_pages:
-        content_pages.append(b'')
-
-    objects: list[bytes] = []
-
-    def add(obj: bytes) -> int:
-        objects.append(obj)
-        return len(objects)
-
-    font_id = add(b'<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
-    page_ids: list[int] = []
-    content_ids: list[int] = []
-    for content in content_pages:
-        cid = add(b'<< /Length ' + str(len(content)).encode() + b' >>\nstream\n'
-                  + content + b'\nendstream')
-        content_ids.append(cid)
-        page_ids.append(0)  # placeholder, patched after the parent is known
-
-    pages_id_placeholder = len(objects) + 1 + len(content_pages)
-    for i, cid in enumerate(content_ids):
-        page_ids[i] = add(
-            f'<< /Type /Page /Parent {pages_id_placeholder} 0 R /MediaBox [0 0 {page_w} {page_h}] '
-            f'/Resources << /Font << /F1 {font_id} 0 R >> >> /Contents {cid} 0 R >>'.encode()
-        )
-    kids = ' '.join(f'{pid} 0 R' for pid in page_ids)
-    pages_id = add(f'<< /Type /Pages /Kids [{kids}] /Count {len(page_ids)} >>'.encode())
-    assert pages_id == pages_id_placeholder, 'page tree id drifted'
-    catalog_id = add(f'<< /Type /Catalog /Pages {pages_id} 0 R >>'.encode())
-
-    out = io.BytesIO()
-    out.write(b'%PDF-1.4\n')
-    offsets = [0]
-    for i, obj in enumerate(objects, start=1):
-        offsets.append(out.tell())
-        out.write(f'{i} 0 obj\n'.encode())
-        out.write(obj)
-        out.write(b'\nendobj\n')
-    xref_at = out.tell()
-    out.write(f'xref\n0 {len(objects) + 1}\n'.encode())
-    out.write(b'0000000000 65535 f \n')
-    for off in offsets[1:]:
-        out.write(f'{off:010d} 00000 n \n'.encode())
-    out.write(f'trailer\n<< /Size {len(objects) + 1} /Root {catalog_id} 0 R >>\n'
-              f'startxref\n{xref_at}\n%%EOF\n'.encode())
-    return out.getvalue()
+    doc.build(story, onFirstPage=footer, onLaterPages=footer)
+    return buffer.getvalue()

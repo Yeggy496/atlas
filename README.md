@@ -6,7 +6,7 @@ A small scheduling application for personal weekly planning, one-class academic 
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Current update: [v0.1.8 interaction fixes](docs/RELEASE_0.1.8.md).
+Current update: [v0.1.9 product workflows](docs/RELEASE_0.1.9.md).
 Local workspace notes: [v0.1.7](docs/RELEASE_0.1.7.md).
 Product interface notes: [v0.1.6](docs/RELEASE_0.1.6.md).
 DeepSeek setup and connection verification: [v0.1.5 notes](docs/RELEASE_0.1.5.md).
@@ -55,11 +55,14 @@ Health check: `/api/health`.
 - CSV/XLSX activity imports using the downloadable templates; maximum 2 MB and 100 rows.
 - Constraints require validation and explicit user review before solving.
 - Workspaces auto-save in the current browser, separately for each scenario. Reloads and reopening restore inputs, drafts, settings, and the last result without loading or solving the preset again. Different browser profiles/devices do not sync; clearing site data removes the local copy.
+- Start a personal blank plan, choose its week, manage resources, undo edits, and download/restore workspace backups on another computer. Imported backups require review and a new solve.
+- The last 12 solve runs stay in the current browser. Public deployments neither expose nor persist shared visitor histories by default; `/api/history` returns an empty list. `ATLAS_SERVER_HISTORY=true` is only for a trusted single-user local service.
+- Chinese PDF and Excel exports use the real on-screen assignments; rescheduling displays changes from the previous plan.
 - Default `LLM_PROVIDER=demo` is a limited offline rule parser, clearly identified in the UI.
 - OpenAI and DeepSeek provider implementations accept server-only environment variables; real API calls require configuration and verification.
 - Time resolution is 30 minutes. This demo targets small inputs, not a whole school.
-- No accounts or per-user history isolation. Public visitors share demo history; avoid sensitive personal inputs.
-- Free hosting can sleep when idle. SQLite history on ephemeral storage may be lost after restarts or deployments.
+- No accounts or cross-device synchronization. Solver inputs reach the server; AI parsing and narration send relevant data to the configured model provider.
+- Free hosting can sleep when idle. Local browser workspaces and histories survive server redeploys; clearing browser storage removes them, so download backups before moving devices.
 - Repairs relax individual constraints and verify feasibility; they do not prove a globally minimal conflict core.
 
 ## LLM provider
@@ -95,12 +98,10 @@ The existing hosted website now uses the official DeepSeek endpoint. To enable a
 
 The check prints the provider, model, base URL, and whether the key is present (never the key itself), and exits non-zero on failure.
 
-*Measured 2026-10 on this project:* the official `https://api.deepseek.com` endpoint with
-`DEEPSEEK_MODEL=deepseek-chat` parses every bundled sample well inside a demo budget
-(lab 5.2 s, life 13.0 s; `POST /api/constraints/parse` returned 200 in 5.0 s).
-A BUPT campus gateway (`deepseek-v4-flash`) answered short requests in 2-9 s, but timed out after
-180-300 s when it had to emit a whole modified problem, so prefer the official endpoint, or another
-fast OpenAI-compatible model, when enabling the real provider on the hosted demo.
+*Measured 2026-10-12 on the deployed project:* the official endpoint with
+`DEEPSEEK_MODEL=deepseek-flash` parsed a full personal plan with a new fixed meeting
+in 17.41 seconds. This is one recorded call, not a latency guarantee or an accuracy benchmark.
+Model gateways must be reachable from the hosting server; test them before use.
 
 ## Tests
 
