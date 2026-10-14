@@ -6,7 +6,8 @@ A small scheduling application for personal weekly planning, one-class academic 
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Current update: [v0.1.9 product workflows](docs/RELEASE_0.1.9.md).
+Current version: v0.1.10 adds an input-clear button that preserves the current tasks and plan.
+Product workflow notes: [v0.1.9](docs/RELEASE_0.1.9.md).
 Local workspace notes: [v0.1.7](docs/RELEASE_0.1.7.md).
 Product interface notes: [v0.1.6](docs/RELEASE_0.1.6.md).
 DeepSeek setup and connection verification: [v0.1.5 notes](docs/RELEASE_0.1.5.md).

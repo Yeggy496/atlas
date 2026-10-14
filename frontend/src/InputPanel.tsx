@@ -1,4 +1,4 @@
-import { type RefObject } from "react";
+import { useRef, type RefObject } from "react";
 import {
   Sparkles,
   ArrowRight,
@@ -104,6 +104,7 @@ export function InputPanel({
   textFileRef,
   importText,
 }: Props) {
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const inputTooLong = input.length > MAX_INPUT_CHARS;
   const activityGroups = new Map<string, Activity[]>();
   for (const a of problem?.activities ?? []) {
@@ -131,6 +132,7 @@ export function InputPanel({
       </div>
       <div className="nl-input">
         <textarea
+          ref={inputRef}
           aria-label="自然语言需求"
           aria-describedby="input-length-hint"
           value={input}
@@ -157,9 +159,21 @@ export function InputPanel({
           </button>
         </div>
       </div>
-      <p id="input-length-hint" className={`input-length-hint ${inputTooLong ? "too-long" : ""}`}>
-        {inputTooLong ? "文本较长，请分段识别，或精简到 4,000 字以内。" : `${input.length.toLocaleString()} / 4,000 字`}
-      </p>
+      <div className="input-meta">
+        <button
+          type="button"
+          className="clear-input-button"
+          disabled={!!busy || input.length === 0}
+          onClick={() => { setInput(""); inputRef.current?.focus(); }}
+          title="清空输入文字"
+        >
+          <X size={12} />
+          清空输入
+        </button>
+        <p id="input-length-hint" className={`input-length-hint ${inputTooLong ? "too-long" : ""}`}>
+          {inputTooLong ? "文本较长，请分段识别，或精简到 4,000 字以内。" : `${input.length.toLocaleString()} / 4,000 字`}
+        </p>
+      </div>
       <div className="import-row">
         <button disabled={!!busy} onClick={() => fileRef.current?.click()}>
           <Upload size={14} />

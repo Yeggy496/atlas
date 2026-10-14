@@ -88,8 +88,26 @@
 .parse-button:hover:not(:disabled) {
   background: #eef3ff;
 }
-.input-length-hint {
+.input-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   margin: 5px 18px 0;
+}
+.clear-input-button {
+  flex-shrink: 0;
+  align-self: flex-start;
+  gap: 3px;
+  padding: 3px 0;
+  color: #8593ad;
+  font-size: 10px;
+}
+.clear-input-button:hover:not(:disabled) {
+  color: #365bd6;
+}
+.input-length-hint {
+  flex: 1;
+  margin: 0;
   font-size: 9px;
   color: #8d99ae;
   text-align: right;
