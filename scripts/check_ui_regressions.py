@@ -23,9 +23,15 @@ with sync_playwright() as p:
     # Validation failures are expected network responses, not runtime failures.
     page.on('console', lambda msg: report['console_errors'].append(msg.text) if msg.type == 'error' and 'status of 422' not in msg.text else None)
     sent = []
+    validations = []
     page.on('request', lambda r: sent.append(r.post_data_json) if r.url.endswith('/api/solve') else None)
+    page.on('request', lambda r: validations.append(r.post_data_json) if r.url.endswith('/api/constraints/validate') else None)
+    page.goto(url, wait_until='networkidle', timeout=120000)
+    assert not sent, 'opening a new browser must not automatically generate a sample plan'
+    welcome = page.get_by_role('dialog', name='开始安排你的时间', exact=True)
+    expect(welcome).to_be_visible()
     with page.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=120000) as pending:
-        page.goto(url, wait_until='networkidle', timeout=120000)
+        welcome.get_by_role('button', name='体验完整示例', exact=True).click()
     initial = pending.value.json()
     assert initial['status'] in ['FEASIBLE', 'OPTIMAL'], initial
     page.locator('.sleep-toggle').click()
@@ -51,6 +57,7 @@ with sync_playwright() as p:
     report['checks'].append('mobile toast stays within viewport during its entry animation')
     report['robust_changed'] = robust['metrics']['changed']
     report['checks'].append('switching to robust mode sends the existing schedule and enables stability')
+    page.locator('.advanced-weights > summary').click()
     stability = page.get_by_role('slider', name='最小扰动', exact=False)
     expect(stability).to_have_attribute('max', '1000')
     expect(stability).to_have_value('1000')
@@ -71,28 +78,51 @@ with sync_playwright() as p:
     dialog.get_by_role('button', name='添加并检查约束', exact=True).click()
     expect(dialog.get_by_role('alert')).to_contain_text('不能只填写空格')
     dialog.get_by_label('活动名称', exact=True).fill('社团临时讨论')
-    with page.expect_response(lambda r: r.url.endswith('/api/constraints/validate')):
+    assert dialog.get_by_label('时长', exact=True).locator('option').count() == 48
+    dialog.get_by_label('时长', exact=True).select_option('5')
+    with page.expect_response(lambda r: r.url.endswith('/api/constraints/validate')) as pending:
         dialog.get_by_role('button', name='添加并检查约束', exact=True).click()
+    assert pending.value.request.post_data_json['activities'][-1]['duration'] == 5
     expect(dialog).not_to_be_visible()
     expect(page.get_by_role('button', name='按自定义重新求解', exact=True)).to_be_disabled()
     expect(page.locator('.weight-hint')).to_contain_text('确认任务与约束后')
-    report['checks'].append('blank task name error is visible in its dialog and unreviewed drafts cannot apply weights')
+    report['checks'].append('blank name is rejected; all48 half-hour durations include validated2.5h; unreviewed drafts cannot apply weights')
+    opener = page.get_by_role('button', name='添加活动', exact=True)
+    opener.click()
+    dialog = page.get_by_role('dialog', name='添加活动', exact=True)
+    dialog.get_by_label('活动名称', exact=True).fill('未保存的键盘操作测试')
+    close = dialog.get_by_role('button', name='关闭', exact=True)
+    close.focus()
+    page.keyboard.press('Shift+Tab')
+    assert page.evaluate('!!document.activeElement.closest(".modal")')
+    for _ in range(18):
+        page.keyboard.press('Tab')
+        assert page.evaluate('!!document.activeElement.closest(".modal")')
+    page.keyboard.press('Escape')
+    expect(dialog.get_by_role('alert')).to_contain_text('还没有保存')
+    dialog.get_by_role('button', name='继续编辑', exact=True).click()
+    expect(dialog.get_by_label('活动名称', exact=True)).to_have_value('未保存的键盘操作测试')
+    close.click()
+    dialog.get_by_role('button', name='丢弃修改并关闭', exact=True).click()
+    expect(dialog).not_to_be_visible()
+    expect(opener).to_be_focused()
+    report['checks'].append('dirty draft close preserves input; Tab/ShiftTab stay inside dialog; discarded close restores opener focus')
     page.locator('.input-tabs button').first.click()
     page.get_by_role('button', name='添加约束', exact=True).click()
     dialog = page.get_by_role('dialog', name='添加约束', exact=True)
     dialog.get_by_label('约束说明', exact=True).fill('周三晚间不可用')
     dialog.get_by_label('开始时间', exact=True).fill('18:00')
-    with page.expect_response(lambda r: r.url.endswith('/api/constraints/validate')) as pending:
-        dialog.get_by_role('button', name='保存约束', exact=True).click()
-    assert pending.value.status == 422
-    expect(dialog.get_by_role('alert')).to_contain_text('起点早于终点')
+    count = len(validations)
+    dialog.get_by_role('button', name='保存约束', exact=True).click()
+    expect(dialog.get_by_role('alert')).to_contain_text('结束时间必须晚于开始时间')
+    assert len(validations) == count, 'invalid time windows must be caught before an API call'
     dialog.get_by_label('结束时间', exact=True).select_option('40')
     with page.expect_response(lambda r: r.url.endswith('/api/constraints/validate')) as pending:
         dialog.get_by_role('button', name='保存约束', exact=True).click()
     assert pending.value.status == 200
     expect(dialog).not_to_be_visible()
     expect(page.locator('.main-content > .message.error')).to_have_count(0)
-    report['checks'].append('real server validation error is visible in dialog and can be corrected successfully')
+    report['checks'].append('invalid time window is rejected inline without an API call; corrected form passes real server validation')
     if not args.smoke:
         problem = json.loads(page.evaluate('localStorage.getItem("atlas.workspace.v1")'))['workspaces']['life']['problem']
         first_id = problem['activities'][0]['id']
@@ -110,7 +140,8 @@ with sync_playwright() as p:
                 expect(dialog.get_by_label('日期', exact=True)).to_have_value('0')
                 dialog.get_by_label('开始时间', exact=True).fill('00:00')
             else:
-                expect(dialog.get_by_label('截止到', exact=True)).to_have_value('48')
+                expect(dialog.get_by_label('截止日期', exact=True)).to_have_value('0')
+                expect(dialog.get_by_label('截止时间', exact=True)).to_have_value('48')
                 dialog.get_by_label('作用对象', exact=True).select_option(first_id)
             with page.expect_response(lambda r: r.url.endswith('/api/constraints/validate')) as pending:
                 dialog.get_by_role('button', name='保存约束', exact=True).click()
@@ -125,8 +156,10 @@ with sync_playwright() as p:
             expect(dialog).not_to_be_visible()
         report['checks'].append('constraint type switches send the target, day and deadline displayed in the form')
         for scenario, label, color in [('meeting', '会议室预订', 'pink'), ('production', '生产排程', 'orange')]:
+            page.get_by_role('button', name=label, exact=True).click()
+            page.get_by_role('button', name='恢复预置方案', exact=True).click()
             with page.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=120000) as pending:
-                page.get_by_role('button', name=label, exact=True).click()
+                page.get_by_role('dialog').get_by_role('button', name='确认恢复', exact=True).click()
             result = pending.value.json()
             assert result['status'] in ['FEASIBLE', 'OPTIMAL'] and result['metrics']['hard_violations'] == 0
             category = '会议' if scenario == 'meeting' else '工序'
@@ -156,10 +189,17 @@ with sync_playwright() as p:
         card = page.locator('.constraint-card').filter(has_text=precise_deadline['label'])
         card.get_by_role('button', name='编辑 ' + precise_deadline['label'], exact=True).click()
         deadline_dialog = page.get_by_role('dialog', name='编辑约束', exact=True)
-        expect(deadline_dialog.get_by_label('截止到', exact=True)).to_have_value('120')
-        expect(deadline_dialog.locator('select[aria-label="截止到"] option:checked')).to_have_text('周三 12:00')
-        deadline_dialog.get_by_role('button', name='关闭', exact=True).click()
-        report['checks'].append('editing an existing midday deadline displays its exact stored time')
+        expect(deadline_dialog.get_by_label('截止日期', exact=True)).to_have_value('2')
+        expect(deadline_dialog.get_by_label('截止时间', exact=True)).to_have_value('24')
+        expect(deadline_dialog.get_by_label('实际约束', exact=True)).to_contain_text('周三 12:00')
+        assert deadline_dialog.get_by_label('截止时间', exact=True).locator('option').count() == 49
+        deadline_dialog.get_by_label('截止时间', exact=True).select_option('25')
+        with page.expect_response(lambda r: r.url.endswith('/api/constraints/validate')) as pending:
+            deadline_dialog.get_by_role('button', name='保存约束', exact=True).click()
+        changed = next(c for c in pending.value.request.post_data_json['constraints'] if c['id'] == precise_deadline['id'])
+        assert changed['end'] == 121 and changed['source'] == 'manual'
+        expect(card).to_contain_text('周三 12:30 前完成')
+        report['checks'].append('midday deadlines display exact stored time; half-hour edit updates solver fields and actual constraint card despite unchanged note')
         sleep_activities = [a for a in template['activities'] if a['category'] == 'sleep']
         for a in sleep_activities:
             a['duration'] = 15

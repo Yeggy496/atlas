@@ -162,6 +162,7 @@ class ExplainRequest(BaseModel):
     assignments: list[Assignment] = Field(default_factory=list, max_length=100)
     activity_id: str = Field(min_length=1, max_length=120)
     previous: list[Assignment] = Field(default_factory=list, max_length=100)
+    include_narrative: bool = True
 
 
 class CompareRequest(BaseModel):

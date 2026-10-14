@@ -31,10 +31,10 @@ class LLMExplanation:
     def __init__(self, provider: str):
         self.provider = provider
 
-    def build(self, problem, assignments, activity_id, previous=None):
+    def build(self, problem, assignments, activity_id, previous=None, include_narrative=True):
         facts = explain(problem, assignments, activity_id, previous)
         base = {**facts, 'narrative': None, 'narrative_source': 'deterministic'}
-        if self.provider not in ('openai', 'deepseek'):
+        if not include_narrative or self.provider not in ('openai', 'deepseek'):
             return base
         try:
             narrative = self._narrate(facts)

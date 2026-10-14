@@ -74,8 +74,10 @@ def solve_current(page):
 
 
 def switch_scene(page, label):
+    page.get_by_role('button', name=label, exact=True).click()
+    page.get_by_role('button', name='恢复预置方案', exact=True).click()
     with page.expect_response(lambda response: response.url.endswith('/api/solve'), timeout=120000) as pending:
-        page.get_by_role('button', name=label, exact=True).click()
+        page.get_by_role('dialog').get_by_role('button', name='确认恢复', exact=True).click()
     result = pending.value.json()
     assert result['status'] in ('FEASIBLE', 'OPTIMAL'), result
     assert result['metrics']['hard_violations'] == 0, result
@@ -111,8 +113,11 @@ try:
         validation_requests = []
         page.on('request', lambda request: validation_requests.append(request.post_data_json)
                 if request.url.endswith('/api/constraints/validate') else None)
+        page.goto(url, wait_until='networkidle', timeout=120000)
+        welcome = page.get_by_role('dialog', name='开始安排你的时间', exact=True)
+        expect(welcome).to_be_visible()
         with page.expect_response(lambda response: response.url.endswith('/api/solve'), timeout=120000) as pending:
-            page.goto(url, wait_until='networkidle', timeout=120000)
+            welcome.get_by_role('button', name='体验完整示例', exact=True).click()
         assert pending.value.json()['metrics']['hard_violations'] == 0
         report['version'] = page.request.get(url + '/api/health').json()['version']
 
@@ -269,8 +274,34 @@ try:
         expect(dialog.get_by_role('alert')).to_contain_text('需求数量需为 1 到 100 的整数')
         assert len(validation_requests) == count
         dialog.get_by_role('button', name='关闭', exact=True).click()
+        expect(dialog.get_by_role('alert').filter(has_text='还没有保存')).to_be_visible()
+        dialog.get_by_role('button', name='丢弃修改并关闭', exact=True).click()
+        expect(dialog).not_to_be_visible()
         report['checks'].append('invalid windows, room requirements without a candidate, and zero equipment demand are rejected with actionable inline errors')
         report['checks'].append('resource and activity dialogs fit a 390 px phone with reachable save buttons and no horizontal overflow')
+        switch_scene(page, '生产排程')
+        before_resources = stored(page, 'production')['problem']['resources']
+        dialog = open_manager(page)
+        section = expand_resource(dialog, '数控机床 1 号')
+        expect(section.get_by_label('资源类型', exact=True)).to_be_enabled()
+        validate_submit(page, dialog, '保存资源')
+        assert stored(page, 'production')['problem']['resources'] == before_resources
+        page.get_by_role('button', name='添加活动', exact=True).click()
+        dialog = page.get_by_role('dialog', name='添加活动', exact=True)
+        dialog.get_by_label('活动名称', exact=True).fill('双机台择一加工测试')
+        dialog.get_by_label('时长', exact=True).select_option('5')
+        dialog.locator('.editor-resource-settings > summary').click()
+        dialog.get_by_role('checkbox', name='候选资源数控机床 1 号', exact=True).check()
+        dialog.get_by_role('checkbox', name='候选资源数控机床 2 号', exact=True).check()
+        validate_submit(page, dialog, '添加并检查约束')
+        operation = wait_for_activity(page, 'production', '双机台择一加工测试')
+        assert operation['room_options'] == ['mill1', 'mill2'] and operation['resources'] == [], operation
+        result = solve_current(page)
+        assignment = next(a for a in result['assignments'] if a['activity_id'] == operation['id'])
+        assert assignment['room_id'] in ['mill1', 'mill2'] and assignment['end'] - assignment['start'] == 5, assignment
+        report['production_result'] = {'status': result['status'], 'hard_violations': result['metrics']['hard_violations'],
+                                       'scheduled': len(result['assignments']), 'new_operation_machine': assignment['room_id']}
+        report['checks'].append('production machine candidates retain their types and validate unchanged; a2.5h operation is allocated to one of two machines by CP-SAT')
         assert not report['page_errors'], report['page_errors']
         assert not report['console_errors'], report['console_errors']
         browser.close()

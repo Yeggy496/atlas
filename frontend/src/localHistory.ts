@@ -25,3 +25,7 @@ export function saveLocalRun(workspace: LocalWorkspace): string {
     return "";
   } catch { return "浏览器未能保存求解历史，当前计划仍可查看，请下载备份。"; }
 }
+export function deleteLocalRun(id: string): string {
+  try { localStorage.setItem(KEY, JSON.stringify(readLocalHistory().filter((row) => row.id !== id))); return ""; }
+  catch { return "无法删除本地记录，请检查浏览器存储权限。"; }
+}

@@ -41,14 +41,19 @@ def stored(page):
 def wait_saved(page, expression):
     page.wait_for_function(f'() => {{ const data = JSON.parse(localStorage.getItem("{key}")); return data && ({expression}); }}')
 
-def fresh(context):
+def fresh(context, expect_saved=True):
     page, requests = watch(context)
+    page.goto(url, wait_until='networkidle', timeout=120000)
+    expect(page.get_by_role('dialog', name='开始安排你的时间', exact=True)).to_be_visible()
+    assert not requests, 'a fresh browser solved a template without user selection'
+    assert stored(page)['workspaces']['life']['problem']['activities'] == []
     with page.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=120000) as pending:
-        page.goto(url, wait_until='networkidle', timeout=120000)
+        page.get_by_role('button', name='体验完整示例', exact=True).click()
     solved = pending.value.json()
     assert solved['status'] in ['FEASIBLE', 'OPTIMAL'], solved
     assert solved['metrics']['hard_violations'] == 0, solved
-    expect(page.locator('.local-save-status')).to_have_text('已保存在此浏览器')
+    if expect_saved:
+        expect(page.locator('.local-save-status')).to_have_text('已保存在此浏览器')
     return page, requests
 
 def reload_saved(page, requests, expected_text, pending=False):
@@ -82,6 +87,7 @@ with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_
         dialog.get_by_role('button', name='添加并检查约束', exact=True).click()
     expect(dialog).not_to_be_visible()
     page.get_by_role('button', name='稳健', exact=True).click()
+    page.locator('.advanced-weights > summary').click()
     slider = page.get_by_role('slider').first
     slider.focus()
     slider.press('End')
@@ -94,8 +100,10 @@ with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_
     assert stored(page)['workspaces']['life'] == draft
     report['checks'].append('unconfirmed task/constraint draft, custom weights and previous assignments survive refresh')
     if not args.smoke:
-        with page.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=120000):
-            page.get_by_role('button', name='智能排课', exact=True).click()
+        count = len(requests)
+        page.get_by_role('button', name='智能排课', exact=True).click()
+        wait_saved(page, 'data.workspaces.academic.problem.activities.length === 0')
+        assert len(requests) == count, 'an uncached scene solved a template without selection'
         page.locator('textarea').fill('本班课程的本地输入草稿')
         wait_saved(page, 'data.workspaces.academic.input === "本班课程的本地输入草稿"')
         academic = stored(page)['workspaces']['academic']
@@ -106,6 +114,9 @@ with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_
         assert len(requests) == count
         assert stored(page)['workspaces']['life'] == draft
         report['checks'].append('scenario switching restores separate workspaces without solving again')
+    expect(page.locator('.pending-input')).to_be_visible()
+    expect(page.locator('.optimize-button')).to_be_disabled()
+    page.get_by_role('button', name='本次仅使用现有任务与约束', exact=True).click()
     page.get_by_role('checkbox', name='我已检查并确认当前任务与约束').check()
     with page.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=120000) as pending:
         page.locator('.optimize-button').click()
@@ -123,6 +134,7 @@ with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_
     if not args.smoke:
         page.get_by_role('button', name='智能排课', exact=True).click()
         expect(page.locator('textarea')).to_have_value(academic['input'])
+        wait_saved(page, 'data.active_scenario === "academic"')
     context.close()
     # Close Chromium completely and reopen the actual same on-disk profile.
     context = p.chromium.launch_persistent_context(profile, **launch)
@@ -158,7 +170,43 @@ with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_
         wait_saved(page, 'data.workspaces.life.input === ' + json.dumps(draft_text))
         assert not second_requests
         second_tab.close()
+        # Explicitly activate the main workspace after closing the other tab.
+        page.get_by_role('button', name='个人周计划', exact=True).click()
+        wait_saved(page, 'data.active_scenario === "life"')
         report['checks'].append('multiple tabs preserve each other\'s edits to different scenarios')
+
+        same_tab, same_requests = watch(context)
+        same_tab.goto(url, wait_until='networkidle', timeout=120000)
+        page.locator('textarea').fill('同一场景主标签页的新需求')
+        wait_saved(page, 'data.workspaces.life.input === "同一场景主标签页的新需求"')
+        expect(same_tab.locator('.storage-warning')).to_be_visible()
+        same_tab.get_by_role('button', name='资源视图', exact=True).click()
+        assert stored(same_tab)['workspaces']['life']['input'] == '同一场景主标签页的新需求', 'stale view changes overwrote newer text'
+        same_tab.get_by_role('button', name='保留当前编辑', exact=True).click()
+        wait_saved(same_tab, 'data.workspaces.life.input === ' + json.dumps(draft_text))
+        expect(page.locator('.storage-warning')).to_be_visible()
+        page.get_by_role('button', name='打开最新内容', exact=True).click()
+        expect(page.locator('textarea')).to_have_value(draft_text)
+        expect(page.locator('.storage-warning')).to_have_count(0)
+        report['checks'].append('same-scenario stale tabs cannot overwrite newer edits and explicit conflict choices work')
+
+        same_tab.evaluate('''(key) => {
+          const data = JSON.parse(localStorage.getItem(key));
+          delete data.workspaces.life;
+          localStorage.setItem(key, JSON.stringify(data));
+        }''', key)
+        expect(page.locator('.storage-warning')).to_be_visible()
+        expect(page.get_by_role('button', name='打开最新内容', exact=True)).to_be_disabled()
+        page.get_by_role('button', name='保留当前编辑', exact=True).click()
+        wait_saved(page, 'data.workspaces.life.input === ' + json.dumps(draft_text))
+        expect(page.locator('.storage-warning')).to_have_count(0)
+        expect(page.locator('.local-save-status')).to_have_text('已保存在此浏览器')
+        assert not same_requests
+        same_tab.close()
+        page.get_by_role('button', name='个人周计划', exact=True).click()
+        page.get_by_role('button', name='周日历', exact=True).click()
+        report['checks'].append('a workspace deleted in another tab still offers a safe keep-current recovery')
+
         other = p.chromium.launch_persistent_context(str(Path(temp) / 'other'), **launch)
         other_page, _ = fresh(other)
         assert stored(other_page)['workspaces']['life']['input'] != draft_text
@@ -171,16 +219,17 @@ with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_
             damaged = p.chromium.launch_persistent_context(str(Path(temp) / name), **launch)
             damaged.add_init_script(f'localStorage.setItem({json.dumps(key)}, {json.dumps(raw)})')
             damaged_page, _ = fresh(damaged)
-            expect(damaged_page.locator('.calendar-event')).to_have_count(28)
+            assert len(stored(damaged_page)['workspaces']['life']['result']['assignments']) == 35
             assert len(stored(damaged_page)['workspaces']['life']['problem']['activities']) == 35
             damaged.close()
         report['checks'].append('malformed stored JSON and invalid workspace shape recover without blank page')
         blocked = p.chromium.launch_persistent_context(str(Path(temp) / 'blocked'), **launch)
         blocked.add_init_script('Storage.prototype.setItem = function() { throw new DOMException("test quota", "QuotaExceededError"); };')
-        blocked_page, _ = watch(blocked)
-        with blocked_page.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=120000):
-            blocked_page.goto(url, wait_until='networkidle', timeout=120000)
-        expect(blocked_page.locator('.calendar-event')).to_have_count(28)
+        blocked_page, blocked_requests = watch(blocked)
+        blocked_page.goto(url, wait_until='networkidle', timeout=120000)
+        with blocked_page.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=120000) as pending:
+            blocked_page.get_by_role('button', name='体验完整示例', exact=True).click()
+        assert len(pending.value.json()['assignments']) == 35
         expect(blocked_page.locator('.storage-warning')).to_contain_text('浏览器未能保存当前内容')
         expect(blocked_page.locator('.local-save-status')).to_have_text('本地保存不可用')
         blocked.close()

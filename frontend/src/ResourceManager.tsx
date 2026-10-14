@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Plus, Search, Trash2 } from "lucide-react";
 import { type Problem, type Resource, DAYS, clock } from "./types";
 import "./styles/resource-manager.css";
+import { useDialogDraft } from "./Editors";
 
 const RESOURCE_TYPES: Record<string, string> = {
   person: "个人 / 参与人",
@@ -52,7 +53,11 @@ export function ResourceManager({
   const [customRoomTypes, setCustomRoomTypes] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const original = useRef(JSON.stringify(resources));
+  const [editingSearchId, setEditingSearchId] = useState<string | null>(null);
   const disabled = busy || saving;
+  useDialogDraft(JSON.stringify(resources) !== original.current, disabled);
   const roomTypes = useMemo(() => [...new Set([
     ...Object.keys(ROOM_TYPES),
     ...problem.resources.map((resource) => resource.room_type),
@@ -100,7 +105,7 @@ export function ResourceManager({
   }
 
   async function save() {
-    if (disabled) return;
+    if (disabled || savingRef.current) return;
     const resourceIds = new Set<string>();
     for (const resource of resources) {
       let message = "";
@@ -112,7 +117,7 @@ export function ResourceManager({
         message = "同时可用数量需为 1 到 100 的整数。";
       } else if (!Number.isInteger(resource.seats) || resource.seats < 0) {
         message = "座位数需为大于或等于 0 的整数。";
-      } else if (resource.type !== "room" && problem.activities.some(
+      } else if (resource.type !== "room" && problem.resources.find((originalResource) => originalResource.id === resource.id)?.type === "room" && problem.activities.some(
         (activity) => activity.room_options.includes(resource.id),
       )) {
         message = `「${resource.name}」是活动的候选场地，请保留场地类型，或先修改活动的候选场地。`;
@@ -132,6 +137,7 @@ export function ResourceManager({
         return;
       }
     }
+    savingRef.current = true;
     setSaving(true);
     setError("");
     try {
@@ -141,12 +147,13 @@ export function ResourceManager({
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : "保存资源失败，请重试。");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
 
   const matching = resources.filter((resource) =>
-    `${resource.name} ${RESOURCE_TYPES[resource.type] ?? resource.type}`.toLocaleLowerCase()
+    resource.id === editingSearchId || `${resource.name} ${resource.id} ${RESOURCE_TYPES[resource.type] ?? resource.type}`.toLocaleLowerCase()
       .includes(query.trim().toLocaleLowerCase()),
   );
 
@@ -163,7 +170,7 @@ export function ResourceManager({
         <label className="resource-manager-search">
           <Search size={15} aria-hidden="true" />
           <input aria-label="搜索资源" value={query} placeholder="搜索名称或类型"
-            onChange={(event) => setQuery(event.target.value)} disabled={disabled} />
+            onChange={(event) => { setEditingSearchId(null); setQuery(event.target.value); }} disabled={disabled} />
         </label>
         <button type="button" className="secondary" onClick={addResource}
           disabled={disabled || resources.length >= 50}>
@@ -178,12 +185,13 @@ export function ResourceManager({
         {matching.map((resource) => {
           const used = references(problem, resource.id);
           const isExpanded = expanded === resource.id;
-          const roomRequired = problem.activities.some((activity) => activity.room_options.includes(resource.id));
+          const roomRequired = problem.resources.find((originalResource) => originalResource.id === resource.id)?.type === "room"
+            && problem.activities.some((activity) => activity.room_options.includes(resource.id));
           const unavailable = used.constraints.filter((constraint) => constraint.type === "unavailable");
           return <section key={resource.id} className={`resource-manager-item ${isExpanded ? "expanded" : ""}`}>
             <button type="button" className="resource-manager-toggle" disabled={disabled}
               aria-expanded={isExpanded} aria-controls={`resource-fields-${resource.id}`}
-              onClick={() => setExpanded(isExpanded ? null : resource.id)}>
+              onClick={() => { setExpanded(isExpanded ? null : resource.id); if (isExpanded) setEditingSearchId(null); }}>
               <span><strong>{resource.name.trim() || "未命名资源"}</strong>
                 <small>{RESOURCE_TYPES[resource.type] ?? resource.type} · {used.activities.length} 项活动使用</small>
               </span>
@@ -193,8 +201,10 @@ export function ResourceManager({
               <label>资源名称
                 <input aria-label="资源名称" maxLength={100} value={resource.name} disabled={disabled}
                   placeholder="例如：张老师 / 实验室 A / 光谱仪"
+                  onFocus={() => { if (query.trim()) setEditingSearchId(resource.id); }}
                   onChange={(event) => update(resource.id, { name: event.target.value })} />
               </label>
+              <p className="resource-manager-hint">导入标识：<code>{resource.id}</code>（重命名不改变关联）</p>
               <div className="resource-manager-grid">
                 <label>资源类型
                   <select aria-label="资源类型" value={resource.type} disabled={disabled || roomRequired}

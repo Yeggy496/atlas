@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { X, Check, Plus } from "lucide-react";
 import {
   type Problem,
@@ -10,43 +10,144 @@ import {
   id,
 } from "./types";
 import "./styles/editor-resource.css";
+import "./styles/forms-polish.css";
+import { describeConstraint } from "./constraintDescription";
+
+const DialogDraftContext = createContext<((dirty: boolean, busy: boolean) => void) | null>(null);
+
+/** Child forms can protect their draft without coupling the parent to each field. */
+export function useDialogDraft(dirty: boolean, busy: boolean) {
+  const register = useContext(DialogDraftContext);
+  useEffect(() => { register?.(dirty, busy); }, [register, dirty, busy]);
+}
 
 export function Dialog({
   title,
   onClose,
   children,
   error,
+  dirty = false,
+  busy = false,
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
   error?: string;
+  dirty?: boolean;
+  busy?: boolean;
 }) {
+  const section = useRef<HTMLElement>(null);
+  const opener = useRef(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+  const closeCallback = useRef(onClose);
+  closeCallback.current = onClose;
+  const [childDraft, setChildDraft] = useState({ dirty: false, busy: false });
+  const [discardRequested, setDiscardRequested] = useState(false);
+  const continueButton = useRef<HTMLButtonElement>(null);
+  const dirtyRef = useRef(false);
+  const busyRef = useRef(false);
+  const discardRef = useRef(false);
+  dirtyRef.current = dirty || childDraft.dirty;
+  busyRef.current = busy || childDraft.busy;
+  discardRef.current = discardRequested;
+  const registerDraft = useRef((childDirty: boolean, childBusy: boolean) => {
+    setChildDraft((current) => current.dirty === childDirty && current.busy === childBusy
+      ? current : { dirty: childDirty, busy: childBusy });
+  }).current;
+  function requestClose() {
+    if (busyRef.current) return;
+    if (dirtyRef.current) { setDiscardRequested(true); return; }
+    closeCallback.current();
+  }
+  const requestCloseRef = useRef(requestClose);
+  requestCloseRef.current = requestClose;
+  useEffect(() => {
+    const modal = section.current;
+    if (!modal) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const inerted: HTMLElement[] = [];
+    let current: HTMLElement | null = modal.parentElement;
+    while (current && current !== document.body) {
+      const parent: HTMLElement | null = current.parentElement;
+      if (!parent) break;
+      for (const sibling of Array.from(parent.children)) {
+        if (sibling !== current && sibling instanceof HTMLElement && !sibling.inert) {
+          sibling.inert = true;
+          inerted.push(sibling);
+        }
+      }
+      current = parent;
+    }
+    const focusable = () => Array.from(modal.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], summary, [tabindex="0"]',
+    )).filter((element) => element.getClientRects().length > 0 && !element.closest("[inert]"));
+    // Capture before autofocus can move it, then select the first editable field.
+    const frame = requestAnimationFrame(() => {
+      const input = modal.querySelector<HTMLElement>('input:not(:disabled), select:not(:disabled), textarea:not(:disabled)');
+      (input ?? focusable()[0] ?? modal).focus();
+    });
+    function keydown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (discardRef.current) setDiscardRequested(false); else requestCloseRef.current();
+      } else if (event.key === "Tab") {
+        const elements = focusable();
+        if (!elements.length) { event.preventDefault(); modal!.focus(); return; }
+        const first = elements[0], last = elements[elements.length - 1];
+        if (event.shiftKey && (document.activeElement === first || !modal!.contains(document.activeElement))) {
+          event.preventDefault(); last.focus();
+        } else if (!event.shiftKey && (document.activeElement === last || !modal!.contains(document.activeElement))) {
+          event.preventDefault(); first.focus();
+        }
+      }
+    }
+    function focusin(event: FocusEvent) {
+      if (event.target instanceof Node && !modal!.contains(event.target)) (focusable()[0] ?? modal!).focus();
+    }
+    document.addEventListener("keydown", keydown, true);
+    document.addEventListener("focusin", focusin);
+    return () => {
+      cancelAnimationFrame(frame);
+      document.removeEventListener("keydown", keydown, true);
+      document.removeEventListener("focusin", focusin);
+      document.body.style.overflow = previousOverflow;
+      inerted.forEach((element) => { element.inert = false; });
+      if (opener.current?.isConnected && !opener.current.closest("[inert]")) opener.current.focus();
+    };
+  }, []);
+  useEffect(() => { if (discardRequested) continueButton.current?.focus(); }, [discardRequested]);
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" onClick={(event) => { if (event.target === event.currentTarget) requestClose(); }}>
       <section
+        ref={section}
+        tabIndex={-1}
         className="modal"
         role="dialog"
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => {
-          if (e.key === "Escape") onClose();
-        }}
       >
         <header>
           <h2>{title}</h2>
           <button
-            autoFocus
             className="icon-button"
-            onClick={onClose}
+            onClick={requestClose}
+            disabled={busy || childDraft.busy}
             aria-label="关闭"
           >
             <X size={20} />
           </button>
         </header>
+        {discardRequested && <div className="dialog-draft-notice" role="alert">
+          <p>当前修改还没有保存，关闭后会丢弃这些修改。</p>
+          <div className="dialog-draft-actions">
+            <button type="button" className="secondary" ref={continueButton} onClick={() => setDiscardRequested(false)}>继续编辑</button>
+            <button type="button" className="discard-draft" onClick={() => { if (!busyRef.current) closeCallback.current(); }}>丢弃修改并关闭</button>
+          </div>
+        </div>}
         {error && <div className="message error dialog-error" role="alert">{error}</div>}
-        {children}
+        <DialogDraftContext.Provider value={registerDraft}>{children}</DialogDraftContext.Provider>
       </section>
     </div>
   );
@@ -81,6 +182,12 @@ export function ConstraintEditor({
     },
   );
   const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const original = useRef(JSON.stringify(c));
+  const dirty = JSON.stringify(c) !== original.current;
+  const [validationError, setValidationError] = useState("");
+  const deadlineDay = c.end === 0 ? 0 : Math.min(6, Math.floor((c.end - 1) / 48));
+  const deadlineTime = c.end - deadlineDay * 48;
   const update = (key: string, value: unknown) => setC({ ...c, [key]: value });
   function changeType(type: Constraint["type"]) {
     const activityOnly = ["fixed_time", "precedence", "min_gap", "consecutive"].includes(type);
@@ -88,34 +195,49 @@ export function ConstraintEditor({
       ...c, type, level: type === "preferred_window" ? "soft" : "hard",
       target: activityOnly && !problem.activities.some((a) => a.id === c.target)
         ? (problem.activities[0]?.id ?? "") : c.target,
-      day: type === "fixed_time" ? (c.day ?? 0) : c.day,
+      day: type === "fixed_time" ? (c.day ?? 0) : type === "daily_limit" ? null : c.day,
+      other: ["precedence", "min_gap", "consecutive"].includes(type) ? c.other : null,
       end: type === "deadline"
         ? Math.max(48, Math.min(336, Math.ceil(c.end / 48) * 48))
         : ["unavailable", "time_window", "preferred_window"].includes(type) ? Math.min(48, c.end) : c.end,
     });
   }
   return (
-    <Dialog title={initial ? "编辑约束" : "添加约束"} onClose={onClose} error={error}>
-      <form
+    <Dialog title={initial ? "编辑约束" : "添加约束"} onClose={onClose} error={validationError || error} dirty={dirty} busy={saving}>
+      <form noValidate
         onSubmit={async (e) => {
           e.preventDefault();
-          if (saving) return;
+          if (savingRef.current) return;
+          let message = "";
+          if (!c.target) message = "请选择约束的作用对象。";
+          else if (![c.start, c.end, c.value].every(Number.isInteger)) message = "时间需以半小时为单位，次数和间隔需为整数。";
+          else if (["unavailable", "time_window", "preferred_window"].includes(c.type) && (c.start < 0 || c.end > 48 || c.start >= c.end)) message = "结束时间必须晚于开始时间，且位于同一天内。";
+          else if (c.type === "fixed_time" && (c.day === null || c.start < 0 || c.start >= 48)) message = "请选择固定事项的日期和有效开始时间。";
+          else if (["precedence", "min_gap", "consecutive"].includes(c.type) && (!c.other || c.other === c.target)) message = "请选择不同的后续活动。";
+          else if (["daily_limit", "min_gap"].includes(c.type) && (c.value < 0 || c.value > 336)) message = "次数或间隔需为 0 到 336 的整数。";
+          if (message) { setValidationError(message); return; }
+          savingRef.current = true;
           setSaving(true);
+          setValidationError("");
           try {
-            await onSave({ ...c, label: c.label.trim() });
+            await onSave({ ...c, label: c.label.trim() || describeConstraint(c, problem).slice(0, 160), source: dirty ? "manual" : c.source });
+          } catch (failure) {
+            setValidationError(failure instanceof Error ? failure.message : "保存约束失败，请重试。");
           } finally {
+            savingRef.current = false;
             setSaving(false);
           }
         }}
       >
+        <fieldset className="dialog-form-fields" disabled={saving}>
         <label>
-          约束说明
+          约束说明（可选）
           <input
-            required
+            aria-label="约束说明"
             maxLength={160}
             value={c.label}
             onChange={(e) => update("label", e.target.value)}
-            placeholder="例如：周三下午不可用"
+            placeholder="例如：因参加培训而不可用"
           />
         </label>
         <div className="form-row">
@@ -183,6 +305,7 @@ export function ConstraintEditor({
           "fixed_time",
           "time_window",
           "preferred_window",
+          "daily_limit",
         ].includes(c.type) && (
           <>
             <label>
@@ -207,7 +330,7 @@ export function ConstraintEditor({
                 ))}
               </select>
             </label>
-            <div className="form-row">
+            {c.type !== "daily_limit" && <div className="form-row">
               <label>
                 开始时间
                 <input
@@ -238,29 +361,24 @@ export function ConstraintEditor({
                   </select>
                 </label>
               )}
-            </div>
+            </div>}
           </>
         )}
         {c.type === "deadline" && (
-          <label>
-            截止到
-            <select
-              aria-label="截止到"
-              value={c.end}
-              onChange={(e) => update("end", Number(e.target.value))}
-            >
-              {(c.end === 0 || c.end % 48 !== 0) && (
-                <option value={c.end}>
-                  {DAYS[Math.floor(c.end / 48)]} {clock(c.end)}
-                </option>
-              )}
-              {DAYS.map((d, i) => (
-                <option value={(i + 1) * 48} key={d}>
-                  {d} 24:00
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="form-row">
+            <label>截止日期
+              <select aria-label="截止日期" value={deadlineDay}
+                onChange={(event) => update("end", Number(event.target.value) * 48 + deadlineTime)}>
+                {DAYS.map((day, index) => <option value={index} key={day}>{day}</option>)}
+              </select>
+            </label>
+            <label>截止时间
+              <select aria-label="截止时间" value={deadlineTime}
+                onChange={(event) => update("end", deadlineDay * 48 + Number(event.target.value))}>
+                {Array.from({ length: 49 }, (_, slot) => <option key={slot} value={slot}>{slot === 48 ? "24:00" : clock(slot)}</option>)}
+              </select>
+            </label>
+          </div>
         )}
         {["precedence", "min_gap", "consecutive"].includes(c.type) && (
           <label>
@@ -288,12 +406,13 @@ export function ConstraintEditor({
             <input
               type="number"
               min="0"
-              max="100"
+              max="336"
               value={c.value}
               onChange={(e) => update("value", Number(e.target.value))}
             />
           </label>
         )}
+        <output className="constraint-fields-preview" aria-label="实际约束">{describeConstraint(c, problem)}</output>
         <div className="form-note">
           {c.level === "soft"
             ? "软约束：尽量满足，无法满足时会产生惩罚。"
@@ -303,6 +422,7 @@ export function ConstraintEditor({
           <Check size={16} />
           {saving ? "正在保存…" : "保存约束"}
         </button>
+        </fieldset>
       </form>
     </Dialog>
   );
@@ -330,6 +450,7 @@ export function ActivityEditor({
     fixedConstraint?.day ?? (initial?.days.length === 1 ? initial.days[0] : -1);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState("");
+  const savingRef = useRef(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [name, setName] = useState(initial?.name ?? "");
   const [duration, setDuration] = useState(initial?.duration ?? 2);
@@ -342,10 +463,10 @@ export function ActivityEditor({
   );
   const [fixed, setFixed] = useState(Boolean(fixedConstraint));
   const [optional, setOptional] = useState(initial?.optional ?? false);
-  const [resources, setResources] = useState<string[]>(initial?.resources ?? (
+  const [resources, setResources] = useState<string[]>(initial?.resources ?? (problem.scenario === "production" ? [] : (
     problem.resources.find((resource) => resource.type !== "room")
       ? [problem.resources.find((resource) => resource.type !== "room")!.id] : []
-  ));
+  )));
   const [demands, setDemands] = useState<Record<string, number>>({ ...initial?.demands });
   const [rooms, setRooms] = useState<string[]>([...(initial?.room_options ?? [])]);
   const [requiredSeats, setRequiredSeats] = useState(initial?.required_seats ?? 0);
@@ -358,7 +479,10 @@ export function ActivityEditor({
   ));
   const selectedResources = [...new Set([...resources, ...Object.keys(demands)])];
   const directResources = problem.resources.filter((resource) => resource.type !== "room" || selectedResources.includes(resource.id));
-  const roomResources = problem.resources.filter((resource) => resource.type === "room" || rooms.includes(resource.id));
+  const roomResources = problem.resources.filter((resource) => resource.type === "room"
+    || (problem.scenario === "production" && ["machine", "equipment"].includes(resource.type))
+    || rooms.includes(resource.id));
+  const candidateLabel = problem.scenario === "production" ? "候选机台 / 设备" : "候选场地";
   const roomTypeNames: Record<string, string> = {
     lecture: "普通教室", computer: "计算机实验室", analysis: "分析实验室",
     general: "基础实验室", meeting: "普通会议室", video: "视频会议室",
@@ -379,17 +503,19 @@ export function ActivityEditor({
   const categoryOptions = Array.from(
     new Set([...Object.keys(CATEGORIES), category]),
   );
-  const durationOptions = Array.from(
-    new Set([1, 2, 3, 4, 6, 8, 16, duration]),
-  ).sort((a, b) => a - b);
+  const durationOptions = Array.from({ length: 48 }, (_, index) => index + 1);
+  const fields = JSON.stringify({ name, duration, category, day, start, fixed, optional, resources,
+    demands, rooms, requiredSeats, roomType, windowStart, windowEnd, allowedDays });
+  const original = useRef(fields);
+  const dirty = original.current !== fields;
   const initialDayLabel =
     allowedDays.length < 7 ? `所选日期内安排（共 ${allowedDays.length} 天）` : "本周任意一天";
   return (
-    <Dialog title={initial ? "编辑活动" : "添加活动"} onClose={onClose} error={validationError || error}>
+    <Dialog title={initial ? "编辑活动" : "添加活动"} onClose={onClose} error={validationError || error} dirty={dirty} busy={saving}>
       <form noValidate
         onSubmit={async (e) => {
           e.preventDefault();
-          if (saving) return;
+          if (savingRef.current) return;
           const aid = initial?.id ?? id();
           const cleanName = name.trim();
           const constraintDay = day === -1 ? 2 : day;
@@ -434,6 +560,7 @@ export function ActivityEditor({
             window_end: windowEnd,
             optional,
           };
+          savingRef.current = true;
           setSaving(true);
           try {
             await onSave(
@@ -451,23 +578,24 @@ export function ActivityEditor({
                   end: 48,
                   other: null,
                   value: 0,
-                  source: fixedConstraint?.source ?? "manual",
+                  source: dirty ? "manual" : fixedConstraint?.source ?? "manual",
                 }
               : undefined,
             );
           } catch (failure) {
             setValidationError(failure instanceof Error ? failure.message : "保存活动失败，请重试。");
           } finally {
+            savingRef.current = false;
             setSaving(false);
           }
         }}
       >
+        <fieldset className="dialog-form-fields" disabled={saving}>
         <label>
           活动名称
           <input
             required
             maxLength={100}
-            autoFocus
             placeholder="例如：社团会议、课程复习"
             value={name}
             onChange={(e) => { setName(e.target.value); setValidationError(""); }}
@@ -550,7 +678,7 @@ export function ActivityEditor({
         <details className="editor-resource-settings" open={settingsOpen}
           onToggle={(event) => setSettingsOpen(event.currentTarget.open)}>
           <summary>资源与时间设置
-            <small>{selectedResources.length} 项资源{rooms.length ? ` · ${rooms.length} 处候选场地` : ""} · {slotLabel(windowStart)}–{slotLabel(windowEnd)}</small>
+            <small>{selectedResources.length} 项资源{rooms.length ? ` · ${rooms.length} 项${candidateLabel}` : ""} · {slotLabel(windowStart)}–{slotLabel(windowEnd)}</small>
           </summary>
           <div className="editor-resource-body">
             <fieldset className="editor-resource-group" disabled={saving}>
@@ -575,14 +703,14 @@ export function ActivityEditor({
               })}
             </fieldset>
             {roomResources.length > 0 && <fieldset className="editor-resource-group" disabled={saving}>
-              <legend>候选场地</legend>
-              <p>每次从所选场地中安排一处；不选则无需额外分配场地。</p>
+              <legend>{candidateLabel}</legend>
+              <p>{problem.scenario === "production" ? "每次从所选机台或设备中分配一项；需同时占用的设备请在上方选择。" : "每次从所选场地中安排一处；不选则无需额外分配场地。"}</p>
               {roomResources.map((resource) => <label className="editor-room-choice" key={resource.id}>
-                <input type="checkbox" aria-label={`候选场地${resource.name}`} checked={rooms.includes(resource.id)}
+                <input type="checkbox" aria-label={`${problem.scenario === "production" ? "候选资源" : "候选场地"}${resource.name}`} checked={rooms.includes(resource.id)}
                   onChange={(event) => { setRooms((current) => event.target.checked ? [...current, resource.id] : current.filter((value) => value !== resource.id)); setValidationError(""); }} />
-                <span>{resource.name}<small>{resource.seats} 座{resource.room_type ? ` · ${roomTypeNames[resource.room_type] ?? resource.room_type}` : ""}</small></span>
+                <span>{resource.name}<small>{resource.type === "room" ? `${resource.seats} 座` : `同时可用 ${resource.capacity} 份`}{resource.room_type ? ` · ${roomTypeNames[resource.room_type] ?? resource.room_type}` : ""}</small></span>
               </label>)}
-              <div className="editor-resource-grid">
+              {problem.scenario !== "production" && <div className="editor-resource-grid">
                 <label>最低座位数
                   <input type="number" aria-label="最低座位数" min={0} step={1}
                     value={Number.isNaN(requiredSeats) ? "" : requiredSeats}
@@ -600,8 +728,8 @@ export function ActivityEditor({
                     <option value="__custom__">自定义类型</option>
                   </select>
                 </label>
-              </div>
-              {customRoomType && <label className="editor-custom-room">自定义类型（与资源的场地类型一致）
+              </div>}
+              {problem.scenario !== "production" && customRoomType && <label className="editor-custom-room">自定义类型（与资源的场地类型一致）
                 <input aria-label="自定义场地类型" maxLength={100} value={roomType}
                   onChange={(event) => { setRoomType(event.target.value); setValidationError(""); }} />
               </label>}
@@ -635,6 +763,7 @@ export function ActivityEditor({
           {initial ? <Check size={16} /> : <Plus size={16} />}
           {saving ? "正在保存…" : initial ? "保存修改" : "添加并检查约束"}
         </button>
+        </fieldset>
       </form>
     </Dialog>
   );

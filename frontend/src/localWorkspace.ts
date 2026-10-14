@@ -8,6 +8,7 @@ export interface LocalWorkspace {
   previous: Assignment[];
   previousProblem?: Problem;
   input: string;
+  appliedInput?: string;
   mode: Mode;
   customWeights: Record<string, number> | null;
   reviewed: boolean;
@@ -81,7 +82,7 @@ function result(value: unknown, p: Problem): value is Result | null {
 export function isLocalWorkspace(value: unknown, s: Scenario): value is LocalWorkspace {
   return record(value) && problem(value.problem, s) && result(value.result, value.problem) &&
     (value.previousProblem === undefined || problem(value.previousProblem, s)) &&
-    assignments(value.previous) && typeof value.input === "string" &&
+    assignments(value.previous) && typeof value.input === "string" && (value.appliedInput === undefined || typeof value.appliedInput === "string") &&
     ["efficient", "balanced", "robust"].includes(String(value.mode)) &&
     (value.customWeights === null || numbers(value.customWeights)) && typeof value.reviewed === "boolean" &&
     strings(value.summary) && strings(value.warnings) &&
@@ -116,6 +117,13 @@ export function readWorkspaceBackup(raw: string): LocalWorkspace {
   if (raw.length > 2_000_000) throw new Error("备份文件不能超过 2 MB。");
   let data: unknown;
   try { data = JSON.parse(raw); } catch { throw new Error("文件不是有效的 JSON 备份。"); }
+  if (record(data) && record(data.problem) && scenario(data.problem.scenario) && problem(data.problem, data.problem.scenario)) {
+    const p = data.problem;
+    // A plan export can restore editable data, but cannot establish approval or correctness.
+    return { problem: p, result: null, previous: record(data.result) && assignments(data.result.assignments) ? data.result.assignments : [],
+      previousProblem: p, input: "", appliedInput: "", mode: "balanced", customWeights: null,
+      reviewed: false, summary: [], warnings: [], inputTab: "activities", view: "calendar" };
+  }
   if (!record(data) || data.format !== "atlas-workspace" || data.version !== 1 ||
     !record(data.workspace) || !record(data.workspace.problem) ||
     !scenario(data.workspace.problem.scenario) ||
@@ -123,6 +131,13 @@ export function readWorkspaceBackup(raw: string): LocalWorkspace {
     throw new Error("请选择由“备份工作空间”下载的 ATLAS 文件，原有内容未改变。");
   }
   return data.workspace;
+}
+
+/** Stable comparison allows safe autosave even for old backups with differently ordered keys. */
+export function workspaceKey(value: LocalWorkspace | undefined): string {
+  const ordered = (item: unknown): unknown => Array.isArray(item) ? item.map(ordered) :
+    record(item) ? Object.fromEntries(Object.keys(item).sort().map((key) => [key, ordered(item[key])])) : item;
+  return value ? JSON.stringify(ordered(value)) : "";
 }
 
 export function writeLocalWorkspaces(store: WorkspaceStore): string {

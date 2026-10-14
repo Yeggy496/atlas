@@ -125,7 +125,7 @@ def explain_assignment(request:ExplainRequest):
     ``demo``/failure keeps the response fully offline and correct.
     """
     try:
-        return get_explanation_service().build(request.problem,request.assignments,request.activity_id,request.previous)
+        return get_explanation_service().build(request.problem,request.assignments,request.activity_id,request.previous,include_narrative=request.include_narrative)
     except KeyError as exc:
         raise HTTPException(404,str(exc)[:500]) from exc
 

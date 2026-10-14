@@ -137,11 +137,32 @@ def validate_parse(data, provider):
     return {**parsed.model_dump(),'provider':provider,'requires_review':True}
 
 
+def _chinese_clock_hour(hour: int, period: str | None) -> int:
+    """Interpret explicit Chinese periods; never guess an unstated AM/PM."""
+    if not 0 <= hour <= 23:
+        raise ValueError('时间的小时须在 0–23 之间。')
+    if period in ('下午', '晚上', '晚'):
+        if 1 <= hour <= 11:
+            return hour + 12
+        if period in ('晚上', '晚') and hour == 12:
+            return 0
+    if period == '凌晨' and hour == 12:
+        return 0
+    if period == '中午' and hour in (1, 2):
+        return hour + 12
+    return hour
+
+
 class DemoProvider:
     """A deliberately small deterministic grammar. Explicitly disclosed in UI."""
     def parse_constraints(self, problem: Problem, text: str):
         p=problem.model_copy(deep=True)
         summary,warnings=[],[]
+        def person_resource():
+            if any(r.id == 'me' for r in p.resources): return 'me'
+            people = [r.id for r in p.resources if r.type == 'person']
+            if len(people) == 1: return people[0]
+            raise ValueError('规则解析需要明确的个人时间资源；请保留「我的时间」，或在资源管理中只设置一个个人资源。')
         chunks=[s.strip() for s in re.split(r'[，,。；;\n]+',text) if s.strip()]
         used=set()
         token=uuid4().hex[:8]
@@ -153,7 +174,7 @@ class DemoProvider:
             p.activities=[a for a in p.activities if a.id not in deleted]
             p.constraints=[c for c in p.constraints if c.target not in deleted and c.other not in deleted]
             for i,d in enumerate(durations):
-                p.activities.append(Activity(id=f'{prefix}{i}',name=f'{name} {i+1}',duration=d,category=category,resources=['me']))
+                p.activities.append(Activity(id=f'{prefix}{i}',name=f'{name} {i+1}',duration=d,category=category,resources=[person_resource()]))
         if p.scenario=='life':
             sleep=re.search(r'睡眠?[^\d，。]*?(\d+(?:\.5)?)\s*小时',text)
             if sleep:
@@ -171,9 +192,9 @@ class DemoProvider:
                 replace_group('run','跑步','exercise',[duration]*count)
                 summary.append(f'每周跑步 {count} 次，每次 {duration/2:g} 小时')
                 mark(r'跑步|每次')
-            pref=re.search(r'(?:最好|尽量|跑步).*?(\d{1,2})\s*(?:点|:00)\s*(?:以?后)',text)
+            pref=re.search(r'(?:最好|尽量|跑步).*?(?:(凌晨|早上|上午|中午|下午|晚上|晚)\s*)?(\d{1,2})\s*(?:点|:00)\s*(?:以?后)',text)
             if pref and ('跑步' in text or running):
-                hour=int(pref[1])
+                hour=_chinese_clock_hour(int(pref[2]), pref[1])
                 if not 0<=hour<22: raise ValueError('跑步偏好时间须早于 22:00。')
                 p.constraints=[c for c in p.constraints if not(c.type=='preferred_window' and c.target=='exercise')]
                 p.constraints.append(Constraint(id=f'pref_{token}',label=f'跑步尽量安排在 {hour:02}:00 以后',type='preferred_window',target='exercise',level='soft',start=hour*2,end=44,source='demo_parser'))
@@ -198,12 +219,15 @@ class DemoProvider:
                 for a in p.activities:
                     if a.category=='homework': p.constraints.append(Constraint(id=f'deadline_{a.id}_{token}',label=f'{a.name} · 周{math[1]} 00:00 前完成',type='deadline',target=a.id,end=day*48,source='demo_parser'))
                 summary.append(f'高数作业在周{math[1]} 00:00 前完成'); mark(r'高数作业')
-            meeting=re.search(r'周([一二三四五六日天])\s*(?:晚上|晚|下午|上午)?\s*(\d{1,2})(?::(00|30)|点)?[^，。]*?会议',text)
+            meeting=re.search(r'周([一二三四五六日天])\s*(?:(凌晨|早上|上午|中午|下午|晚上|晚)\s*)?(\d{1,2})(?::(\d{2})|点(?:([\d]+)分?|半)?)?[^，。]*?会议',text)
             if meeting:
-                day='一二三四五六日'.index(meeting[1].replace('天','日')); hour=int(meeting[2]); minute=int(meeting[3] or '0')
+                day='一二三四五六日'.index(meeting[1].replace('天','日'))
+                hour=_chinese_clock_hour(int(meeting[3]), meeting[2])
+                minute=int(meeting[4] or meeting[5] or ('30' if '点半' in meeting[0] else '0'))
+                if minute not in (0,30): raise ValueError('会议时间请按半小时填写，例如 19:00 或 19:30；没有自动四舍五入。')
                 if not 0<=hour<=22: raise ValueError('会议时间必须在 00:00–22:30 内。')
                 aid=f'meeting_{token}'
-                p.activities.append(Activity(id=aid,name='临时会议',duration=2,category='meeting',resources=['me'],days=[day],window_start=0,window_end=48))
+                p.activities.append(Activity(id=aid,name='临时会议',duration=2,category='meeting',resources=[person_resource()],days=[day],window_start=0,window_end=48))
                 p.constraints.append(Constraint(id=f'fixed_{token}',label=f'周{meeting[1]} {hour:02}:{minute:02} 临时会议 · 1 小时',type='fixed_time',target=aid,day=day,start=hour*2+minute//30,source='demo_parser'))
                 summary.append(f'新增周{meeting[1]} {hour:02}:{minute:02} 会议，默认 1 小时'); mark(r'会议')
         else:

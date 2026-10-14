@@ -6,7 +6,7 @@ A small scheduling application for personal weekly planning, one-class academic 
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Current version: v0.1.11 supports clearing input, constraints, activities, or all current content; bulk actions require confirmation and support undo.
+Current version: v0.2.0 improves the complete daily workflow: start with your own tasks, review AI changes, schedule, inspect and adjust. [Release notes](docs/RELEASE_0.2.0.md).
 Product workflow notes: [v0.1.9](docs/RELEASE_0.1.9.md).
 Local workspace notes: [v0.1.7](docs/RELEASE_0.1.7.md).
 Product interface notes: [v0.1.6](docs/RELEASE_0.1.6.md).
@@ -56,12 +56,18 @@ Health check: `/api/health`.
 - CSV/XLSX activity imports using the downloadable templates; maximum 2 MB and 100 rows.
 - Constraints require validation and explicit user review before solving.
 - Workspaces auto-save in the current browser, separately for each scenario. Reloads and reopening restore inputs, drafts, settings, and the last result without loading or solving the preset again. Different browser profiles/devices do not sync; clearing site data removes the local copy.
+- New visitors start with an empty plan; a complete example is an explicit choice. Cached workspaces are preserved. New plans and examples use the browser's current week.
+- Same-scenario tab conflicts block stale saves and offer opening the latest copy, keeping the current edit, or backing it up. Input that has not been recognized blocks solving until the user parses it or explicitly chooses only the existing model.
 - Start a personal blank plan, choose its week, manage resources, undo edits, and download/restore workspace backups on another computer. Imported backups require review and a new solve.
+- Edit names, search/filter tasks, repeat activities on selected days, and edit/fix/unlock events from the calendar. Up to ten content edits can be undone during the current session; reloading or changing scenarios resets undo records.
+- View a week, one day, or an agenda. Mobile defaults to the agenda, offers history navigation, and scrolls to the generated plan. Early/late activities cannot be silently hidden.
+- CSV/XLSX accepts Chinese headers, current resource IDs or unambiguous names, and native spreadsheet time cells. Imports append activities and disclose potential duplicates. TXT/PDF preserves the extracted text up to 200,000 characters; the user parses it in chunks of up to 4,000 characters without losing the remaining text.
+- Event details retrieve deterministic solver facts first. AI narration is requested explicitly and cached in the current session; opening an event does not automatically incur a model call.
 - The last 12 solve runs stay in the current browser. Public deployments neither expose nor persist shared visitor histories by default; `/api/history` returns an empty list. `ATLAS_SERVER_HISTORY=true` is only for a trusted single-user local service.
 - Chinese PDF and Excel exports use the real on-screen assignments; rescheduling displays changes from the previous plan.
 - Default `LLM_PROVIDER=demo` is a limited offline rule parser, clearly identified in the UI.
 - OpenAI and DeepSeek provider implementations accept server-only environment variables; real API calls require configuration and verification.
-- Time resolution is 30 minutes. This demo targets small inputs, not a whole school.
+- Time resolution is 30 minutes. Individual activities stay within one calendar day; split an overnight activity into two parts. The application targets small inputs, not a whole school.
 - No accounts or cross-device synchronization. Solver inputs reach the server; AI parsing and narration send relevant data to the configured model provider.
 - Free hosting can sleep when idle. Local browser workspaces and histories survive server redeploys; clearing browser storage removes them, so download backups before moving devices.
 - Repairs relax individual constraints and verify feasibility; they do not prove a globally minimal conflict core.

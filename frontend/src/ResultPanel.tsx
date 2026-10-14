@@ -51,8 +51,16 @@ const PENALTIES: Record<string, { label: string; description: string }> = {
   },
   stability: {
     label: "方案稳定",
-    description: "已有任务的时间或教室发生变动的数量",
+    description: "已有任务的时间或所用资源发生变动的数量",
   },
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  OPTIMAL: "最优方案",
+  FEASIBLE: "可行方案",
+  INFEASIBLE: "约束冲突",
+  UNKNOWN: "暂未找到方案",
+  MODEL_INVALID: "模型需要修正",
 };
 
 export function ResultPanel({
@@ -67,6 +75,13 @@ export function ResultPanel({
   setSelected,
 }: Props) {
   const metric = result?.metrics;
+  const solved = result?.status === "OPTIMAL" || result?.status === "FEASIBLE";
+  const scheduledIds = new Set(result?.assignments.map((x) => x.activity_id) ?? []);
+  const required = problem?.activities.filter((a) => !a.optional) ?? [];
+  const optional = problem?.activities.filter((a) => a.optional) ?? [];
+  const requiredScheduled = required.filter((a) => scheduledIds.has(a.id)).length;
+  const optionalScheduled = optional.filter((a) => scheduledIds.has(a.id)).length;
+  const unassigned = problem?.activities.filter((a) => !scheduledIds.has(a.id)) ?? [];
   return (
     <section className="result-panel panel" aria-busy={!!busy}>
       <div className="result-heading">
@@ -74,7 +89,7 @@ export function ResultPanel({
           <div className="result-title">
             <h2>{problem?.name ?? "我的一周"}</h2>
             <span className="sample-label">
-              {result ? "已求解" : summary.length ? "待确认变更" : "待生成计划"}
+              {solved ? "已生成计划" : result ? "需要处理" : summary.length ? "待确认变更" : "待生成计划"}
             </span>
           </div>
           <p>
@@ -94,6 +109,7 @@ export function ResultPanel({
           <div className="view-switch">
             <button
               aria-label="周日历"
+              aria-pressed={view === "calendar"}
               className={view === "calendar" ? "active" : ""}
               onClick={() => setView("calendar")}
             >
@@ -102,6 +118,7 @@ export function ResultPanel({
             </button>
             <button
               aria-label="资源视图"
+              aria-pressed={view === "resources"}
               className={view === "resources" ? "active" : ""}
               onClick={() => setView("resources")}
             >
@@ -129,24 +146,25 @@ export function ResultPanel({
               <FileText size={17} />
             </button>
             <button
-              title="下载当前计划 JSON"
+              title="下载方案 JSON（任务与求解结果；完整工作区请使用备份）"
               aria-label="下载计划 JSON"
-              className="icon-button"
+              className="icon-button plan-json-button"
               disabled={!result?.assignments.length}
               onClick={() => exportPlan("json")}
             >
               <Download size={17} />
+              <span>方案 JSON</span>
             </button>
           </div>
         </div>
       </div>
       <div
-        className={`solver-strip ${["INFEASIBLE", "UNKNOWN"].includes(result?.status ?? "") ? "infeasible" : ""}`}
+        className={`solver-strip ${result && !solved ? "infeasible" : !result && !busy ? "waiting" : ""}`}
       >
         <div>
           {busy ? (
             <Loader2 size={14} className="spin" />
-          ) : result?.assignments.length ? (
+          ) : solved ? (
             <CheckCircle2 size={15} />
           ) : result?.status === "INFEASIBLE" ? (
             <AlertTriangle size={15} />
@@ -154,7 +172,7 @@ export function ResultPanel({
             <Clock3 size={15} />
           )}
           <strong>
-            {busy ? busy : (result?.status ?? "等待确认")}
+            {busy ? busy : result ? `${result.status} · ${STATUS_LABELS[result.status] ?? "求解已结束"}` : "等待确认"}
           </strong>
           {metric?.scheduled !== undefined && (
             <span>{metric.scheduled} 项活动已安排</span>
@@ -169,6 +187,14 @@ export function ResultPanel({
           {result ? `${metric?.solve_time}s · CP-SAT` : "确认约束后开始优化"}
         </span>
       </div>
+      {solved && problem && (
+        <div className="schedule-completion" role="status">
+          <span><strong>必需活动 {requiredScheduled} / {required.length}</strong> 已安排</span>
+          {optional.length > 0 && <span>可选活动 {optionalScheduled} / {optional.length}</span>}
+          {metric?.hard_violations !== undefined && <span>硬约束违反 {metric.hard_violations} 项</span>}
+          {unassigned.length > 0 && <details><summary>{unassigned.length} 项未安排活动</summary><ul>{unassigned.map((a) => <li key={a.id}>{a.name} · {a.optional ? "可选，未纳入本次方案" : "必需，请检查模型与结果"}</li>)}</ul></details>}
+        </div>
+      )}
       {result && ["INFEASIBLE", "UNKNOWN"].includes(result.status) ? (
         <div className="conflict-view">
           <div className="conflict-illustration">
@@ -231,7 +257,7 @@ export function ResultPanel({
         <div className="resource-view">
           <h3>资源占用</h3>
           <p className="muted">
-            按完整一周 168 小时 × 资源数量计算。教室座位数独立校验。
+            占用率 = 实际占用量 ÷（168 小时 × 并发容量）。这是整周占用率，未扣除不可用时段；教室座位数独立校验。
           </p>
           {problem.resources.map((r) => {
             const used =
@@ -266,13 +292,14 @@ export function ResultPanel({
                 </div>
                 <div className="resource-bar">
                   <span
+                    data-unused={used === 0}
                     style={{
                       width: `${Math.min(100, (used / (168 * r.capacity)) * 100)}%`,
                     }}
                   />
                 </div>
                 <strong>
-                  {used} <small>小时</small>
+                  {used} <small>{r.capacity > 1 ? "单位·小时" : "小时"} · {Math.round((used / (168 * r.capacity)) * 1000) / 10}%</small>
                 </strong>
               </div>
             );

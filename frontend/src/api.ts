@@ -28,11 +28,12 @@ export async function api<T>(path: string, body?: unknown): Promise<T> {
     response = await fetch(
     `/api${path}`,
     body === undefined
-      ? undefined
+      ? { signal: AbortSignal.timeout(150_000) }
       : {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
+          signal: AbortSignal.timeout(150_000),
         },
     );
   } catch {

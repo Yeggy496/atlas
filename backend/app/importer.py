@@ -1,28 +1,76 @@
-"""Strict CSV/XLSX template import; structured files are not sent to a model.
-
-TXT/PDF are handled by a separate, clearly-scoped path: they carry unstructured
-text, so we only extract plain text deterministically and hand it to the existing
-natural-language constraint pipeline (``/api/constraints/parse``). Per MASTER_SPEC
-§11, "能用确定性程序解决的，不交给大模型猜" — extraction is deterministic; only
-the already-existing NL understanding step sees a model.
-"""
+"""Deterministic file import. Structured rows never pass through a model."""
 import csv
+from datetime import datetime, time
 from decimal import Decimal, InvalidOperation
-from io import StringIO, BytesIO
+from io import BytesIO, StringIO
+import math
+import re
 from uuid import uuid4
+
 from openpyxl import load_workbook
+
 from .schemas import Activity, Constraint, Problem
 
 
+MAX_FILE_BYTES = 2_000_000
+MAX_TEXT_CHARS = 200_000
+PARSE_TEXT_CHARS = 4_000
+TEXT_SUFFIXES = ('.txt',)
+PDF_SUFFIXES = ('.pdf',)
+
+HEADER_ALIASES = {
+    '活动名称': 'name', '任务名称': 'name', '课程名称': 'name', '名称': 'name',
+    '时长': 'duration_minutes', '时长(分钟)': 'duration_minutes',
+    '时长（分钟）': 'duration_minutes', '持续时间(分钟)': 'duration_minutes',
+    '持续时间（分钟）': 'duration_minutes', '分钟': 'duration_minutes',
+    '星期': 'day', '周几': 'day', '日期': 'day',
+    '开始时间': 'start', '固定时间': 'start',
+    '资源': 'resources', '资源名称': 'resources', '资源id': 'resources',
+    '类别': 'category', '分类': 'category',
+}
+SCENARIO_DEFAULTS = {
+    'life': ('me', 'person', 'study'),
+    'academic': ('class', 'class', 'course'),
+    'lab': ('teamA', 'team', 'experiment'),
+    'meeting': ('room_m', 'room', 'meeting'),
+    'production': ('mill1', 'machine', 'production'),
+}
+
+
 def parse_clock(value):
-    h,m=map(int,str(value).strip().split(':'))
-    if not 0<=h<=23 or m not in (0,30): raise ValueError('时间请使用 HH:00 或 HH:30。')
-    return h*2+m//30
+    """Accept common Excel time cells without rounding unsupported precision."""
+    hint = '开始时间请使用 00:00–23:30，按半小时填写（例如 19:00 或 19:30）。'
+    if isinstance(value, datetime):
+        value = value.time()
+    if isinstance(value, time):
+        if value.second or value.microsecond or value.minute not in (0, 30):
+            raise ValueError(hint)
+        return value.hour * 2 + value.minute // 30
+    if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+        # Excel can expose an unformatted clock as a fraction of a day.
+        try:
+            slots = Decimal(str(value)) * 48
+        except InvalidOperation as exc:
+            raise ValueError(hint) from exc
+        nearest = slots.to_integral_value()
+        if (not slots.is_finite() or not 0 <= nearest < 48
+                or abs(slots - nearest) > Decimal('0.00000001')):
+            raise ValueError(hint)
+        return int(nearest)
+    match = re.fullmatch(r'(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d+))?)?', str(value).strip())
+    if not match:
+        raise ValueError(hint)
+    hour, minute = int(match[1]), int(match[2])
+    seconds, fraction = int(match[3] or 0), match[4] or ''
+    if (not 0 <= hour <= 23 or minute not in (0, 30)
+            or seconds or any(c != '0' for c in fraction)):
+        raise ValueError(hint)
+    return hour * 2 + minute // 30
 
 
 def parse_integer(value, label):
     try:
-        number=Decimal(str(value).strip())
+        number = Decimal(str(value).strip())
     except InvalidOperation as exc:
         raise ValueError(f'{label}须填写整数。') from exc
     if not number.is_finite() or number != number.to_integral_value():
@@ -30,85 +78,180 @@ def parse_integer(value, label):
     return int(number)
 
 
-def import_table(problem:Problem, filename:str, content:bytes):
-    if len(content)>2_000_000: raise ValueError('上传文件最大为 2 MB。')
+def _headers(values):
+    values = list(values)
+    while values and (values[-1] is None or not str(values[-1]).strip()):
+        values.pop()
+    result = []
+    for value in values:
+        key = str(value or '').strip().lower()
+        result.append(HEADER_ALIASES.get(key, key))
+    if len(set(result)) != len(result):
+        raise ValueError('表头有重复列，请每种信息只保留一列。')
+    if not {'name', 'duration_minutes'}.issubset(result):
+        raise ValueError('文件缺少 name（活动名称）或 duration_minutes（时长/分钟）列，请下载模板。')
+    return result
+
+
+def _read_rows(filename, content):
+    if len(content) > MAX_FILE_BYTES:
+        raise ValueError('上传文件最大为 2 MB。')
     if filename.lower().endswith('.csv'):
-        try: raw=content.decode('utf-8-sig')
-        except UnicodeDecodeError: raw=content.decode('gb18030')
-        rows=list(csv.DictReader(StringIO(raw)))
-    elif filename.lower().endswith('.xlsx'):
-        book=load_workbook(BytesIO(content),read_only=True,data_only=True)
+        raw = _decode_text(content)
         try:
-            sheet=book.active
-            iterator=sheet.iter_rows(values_only=True)
-            first=next(iterator,None)
-            if first is None: raise ValueError('文件为空，请下载模板并填写活动。')
-            headers=[str(x).strip() for x in first]
-            rows=[dict(zip(headers,line)) for line in iterator if any(v is not None for v in line)]
-        finally: book.close()
-    else: raise ValueError('任务表支持 CSV 和 XLSX 模板。')
-    if not rows or len(rows)>100: raise ValueError('文件须包含 1–100 行活动。')
-    p=problem.model_copy(deep=True)
-    resource_ids={r.id for r in p.resources}
-    summary=[]
-    for index,row in enumerate(rows,2):
-        if not {'name','duration_minutes'}.issubset(row): raise ValueError('文件缺少 name 或 duration_minutes 列，请下载模板。')
-        name=str(row['name'] or '').strip()
-        minutes=parse_integer(row['duration_minutes'],f'第 {index} 行时长')
-        if minutes<=0 or minutes%30: raise ValueError(f'第 {index} 行时长须为正数且为 30 分钟整数倍。')
-        rid_text=str(row.get('resources') or ('me' if p.scenario=='life' else ('class' if p.scenario=='academic' else 'teamA')))
-        ids=[x.strip() for x in rid_text.split('|') if x.strip()]
-        if not ids or not set(ids).issubset(resource_ids): raise ValueError(f'第 {index} 行引用未知资源 ID。')
-        aid='import_'+uuid4().hex[:10]
-        a=Activity(id=aid,name=name,duration=minutes//30,category=str(row.get('category') or 'study'),resources=ids)
-        day=row.get('day'); start=row.get('start')
-        if day is not None and str(day).strip()!='':
-            a.days=[parse_integer(day,f'第 {index} 行日期')-1]
-        if start is not None and str(start).strip()!='':
-            if len(a.days)!=1: raise ValueError(f'第 {index} 行固定时间必须同时指定 day (1–7)。')
-            p.constraints.append(Constraint(id='fixed_'+aid,label=f'{name} · 导入固定日程',type='fixed_time',target=aid,day=a.days[0],start=parse_clock(start),source='file'))
-            a.window_start=0; a.window_end=48
-        p.activities.append(a)
-        summary.append(f'导入 {name} · {minutes} 分钟')
-    return {'problem':Problem.model_validate(p.model_dump()).model_dump(),'summary':summary,'requires_review':True}
+            dialect = csv.Sniffer().sniff(raw[:4096], delimiters=',;\t')
+        except csv.Error:
+            dialect = csv.excel
+        reader = csv.reader(StringIO(raw), dialect=dialect)
+        first = next(reader, None)
+        if first is None:
+            raise ValueError('文件为空，请下载模板并填写活动。')
+        headers = _headers(first)
+        rows = []
+        for index, line in enumerate(reader, 2):
+            if not any(str(value).strip() for value in line):
+                continue
+            if len(line) > len(headers):
+                raise ValueError(f'第 {index} 行列数超过表头；名称中含逗号时请使用双引号包围。')
+            rows.append((index, dict(zip(headers, line))))
+        return rows
+    if filename.lower().endswith('.xlsx'):
+        book = load_workbook(BytesIO(content), read_only=True, data_only=True)
+        try:
+            iterator = book.active.iter_rows(values_only=True)
+            first = next(iterator, None)
+            if first is None:
+                raise ValueError('文件为空，请下载模板并填写活动。')
+            headers = _headers(first)
+            return [(index, dict(zip(headers, line))) for index, line in enumerate(iterator, 2)
+                    if any(value is not None and str(value).strip() for value in line)]
+        finally:
+            book.close()
+    raise ValueError('任务表支持 CSV 和 XLSX 模板。')
 
 
-# --------------------------------------------------------------------------- #
-# Unstructured text import (TXT / PDF) — MASTER_SPEC §11.
-# These only extract plain text; they never add activities or constraints.
-# The extracted text is returned to the caller, which forwards it to the
-# existing natural-language constraint pipeline for user review.
-# --------------------------------------------------------------------------- #
+def _resource_ids(problem, cell):
+    resources = {resource.id: resource for resource in problem.resources}
+    names = {}
+    for resource in problem.resources:
+        names.setdefault(resource.name.strip(), []).append(resource.id)
+    if cell is None or not str(cell).strip():
+        default_id, kind, _ = SCENARIO_DEFAULTS[problem.scenario]
+        if default_id in resources:
+            return [default_id]
+        candidates = [resource.id for resource in problem.resources if resource.type == kind]
+        if len(candidates) == 1:
+            return candidates
+        if len(resources) == 1:
+            return list(resources)
+        raise ValueError('资源未填写且无法唯一确定。请填写当前资源的名称或 ID，多项用 | 分隔。')
+    selected = []
+    for token in re.split(r'[|；;、\n]+', str(cell)):
+        token = token.strip()
+        if not token:
+            continue
+        if token in resources:
+            resource_id = token
+        elif token in names and len(names[token]) == 1:
+            resource_id = names[token][0]
+        elif token in names:
+            raise ValueError(f'资源「{token}」存在重名，请填写具体资源 ID。')
+        else:
+            raise ValueError(f'找不到资源「{token}」。请先在资源管理中添加，或使用现有资源名称/ID。')
+        if resource_id not in selected:
+            selected.append(resource_id)
+    if not selected:
+        raise ValueError('资源不能为空，请填写当前资源的名称或 ID。')
+    return selected
 
-MAX_TEXT_CHARS = 20_000
-TEXT_SUFFIXES = ('.txt',)
-PDF_SUFFIXES = ('.pdf',)
+
+def _day(value):
+    chinese = re.fullmatch(r'(?:周|星期)([一二三四五六日天])', str(value).strip())
+    if chinese:
+        return '一二三四五六日'.index(chinese[1].replace('天', '日'))
+    day = parse_integer(value, '日期')
+    if not 1 <= day <= 7:
+        raise ValueError('日期请填写 1–7（周一至周日），或「周三」这样的星期。')
+    return day - 1
+
+
+def _signature(activity, fixed):
+    return (activity.name, activity.duration, activity.category,
+            tuple(sorted(activity.resources)), tuple(sorted(activity.days)), fixed)
+
+
+def import_table(problem: Problem, filename: str, content: bytes):
+    rows = _read_rows(filename, content)
+    if not rows or len(rows) > 100:
+        raise ValueError('文件须包含 1–100 行活动。')
+    if len(problem.activities) + len(rows) > 100:
+        raise ValueError(f'当前有 {len(problem.activities)} 项活动，本次将新增 {len(rows)} 项；总数不能超过 100。请减少导入行数或先清空活动。')
+    p = problem.model_copy(deep=True)
+    fixed_by_activity = {c.target: (c.day, c.start) for c in p.constraints if c.type == 'fixed_time'}
+    known = {_signature(activity, fixed_by_activity.get(activity.id)) for activity in p.activities}
+    summary, warnings, duplicate_candidates = [], [], 0
+    for index, row in rows:
+        try:
+            name = str(row.get('name') or '').strip()
+            if not name or len(name) > 100:
+                raise ValueError('活动名称须填写 1–100 个字符。')
+            minutes = parse_integer(row.get('duration_minutes'), '时长')
+            if minutes <= 0 or minutes > 1440 or minutes % 30:
+                raise ValueError('时长须为 30–1440 分钟，且为 30 分钟整数倍。')
+            ids = _resource_ids(p, row.get('resources'))
+            activity = Activity(id='import_' + uuid4().hex[:10], name=name,
+                duration=minutes // 30, resources=ids,
+                category=str(row.get('category') or '').strip() or SCENARIO_DEFAULTS[p.scenario][2])
+            day, start = row.get('day'), row.get('start')
+            if day is not None and str(day).strip():
+                activity.days = [_day(day)]
+            fixed = None
+            if start is not None and str(start).strip():
+                if len(activity.days) != 1:
+                    raise ValueError('固定时间必须同时指定 day（1–7）或星期。')
+                slot = parse_clock(start)
+                if slot + activity.duration > 48:
+                    raise ValueError('固定活动的结束时间超过当天 24:00，请拆成两项活动。')
+                fixed = (activity.days[0], slot)
+                p.constraints.append(Constraint(id='fixed_' + activity.id,
+                    label=f'{name} · 周{"一二三四五六日"[activity.days[0]]} {slot // 2:02}:{slot % 2 * 30:02} 开始',
+                    type='fixed_time', target=activity.id, day=activity.days[0], start=slot, source='file'))
+                activity.window_start, activity.window_end = 0, 48
+            signature = _signature(activity, fixed)
+            if signature in known:
+                duplicate_candidates += 1
+                warnings.append(f'第 {index} 行「{name}」与现有或本文件中的活动相似，已作为独立活动追加；请确认是否重复。')
+            known.add(signature)
+            p.activities.append(activity)
+            summary.append(f'导入 {name} · {minutes} 分钟')
+        except ValueError as exc:
+            raise ValueError(f'第 {index} 行：{exc}') from exc
+    if len(p.constraints) > 200:
+        raise ValueError('导入后约束超过 200 条，请减少固定日程或先清理约束。')
+    return {'problem': Problem.model_validate(p.model_dump()).model_dump(),
+            'summary': summary, 'warnings': warnings, 'added_count': len(rows),
+            'duplicate_candidates': duplicate_candidates, 'requires_review': True}
 
 
 def extract_text(filename: str, content: bytes) -> dict:
-    """Extract plain text from a .txt or .pdf file without interpreting it.
-
-    Deterministic by design: TXT is decoded (UTF-8/GB18030 fallback), PDF text is
-    read page by page with pypdf when it is installed. Nothing here guesses at
-    tasks or constraints — that is the job of the reviewed NL pipeline.
-    """
-    if len(content) > 2_000_000:
+    """Extract the entire supported document, leaving interpretation for review."""
+    if len(content) > MAX_FILE_BYTES:
         raise ValueError('上传文件最大为 2 MB。')
     name = filename.lower()
     if name.endswith(TEXT_SUFFIXES):
-        text = _decode_text(content)
-        kind = 'txt'
+        text, kind = _decode_text(content), 'txt'
     elif name.endswith(PDF_SUFFIXES):
-        text = _extract_pdf(content)
-        kind = 'pdf'
+        text, kind = _extract_pdf(content), 'pdf'
     else:
         raise ValueError('文本导入支持 TXT 和 PDF；结构化数据请使用 CSV / XLSX 模板。')
     text = text.strip()
     if not text:
         raise ValueError('未能从文件中提取到文字。扫描版 PDF 需要先做 OCR。')
     if len(text) > MAX_TEXT_CHARS:
-        text = text[:MAX_TEXT_CHARS]
-    return {'kind': kind, 'text': text, 'chars': len(text)}
+        raise ValueError(f'提取的文字超过 {MAX_TEXT_CHARS:,} 字，请拆分文件后导入；没有截取或导入部分内容。')
+    return {'kind': kind, 'text': text, 'chars': len(text), 'original_chars': len(text),
+            'truncated': False, 'parse_limit': PARSE_TEXT_CHARS,
+            'chunk_count': math.ceil(len(text) / PARSE_TEXT_CHARS)}
 
 
 def _decode_text(content: bytes) -> str:
@@ -128,6 +271,6 @@ def _extract_pdf(content: bytes) -> str:
     try:
         reader = PdfReader(BytesIO(content))
         pages = [(page.extract_text() or '').strip() for page in reader.pages]
-    except Exception as exc:  # noqa: BLE001 - surface any pdf parse failure as a friendly 422
+    except Exception as exc:
         raise ValueError('PDF 解析失败，请确认文件未加密且非扫描件。') from exc
     return '\n'.join(page for page in pages if page)

@@ -39,7 +39,11 @@ with sync_playwright() as p:
                                 'solve_time': result['metrics']['solve_time'], 'hard_violations': 0})
         return result
 
-    initial = solved(lambda: page.goto(url, wait_until='networkidle', timeout=180000))
+    page.goto(url, wait_until='networkidle', timeout=180000)
+    expect(page.get_by_role('dialog', name='开始安排你的时间', exact=True)).to_be_visible()
+    assert page.evaluate("JSON.parse(localStorage.getItem('atlas.workspace.v1')).workspaces.life.problem.activities.length") == 0
+    initial = solved(lambda: page.get_by_role('button', name='体验完整示例', exact=True).click())
+    report['checks'].append('a new browser starts blank and loads a full example only after explicit selection')
     assert page.request.get(url + '/api/history').json() == []
     health = page.request.get(url + '/api/health').json()
     assert health['history_scope'] == 'browser'
@@ -99,7 +103,10 @@ with sync_playwright() as p:
         dialog.get_by_role('button', name='保存资源', exact=True).click()
     report['checks'].append('resource changes are validated, require review, and cannot delete an in-use resource')
 
-    solved(lambda: page.get_by_role('button', name='智能排课', exact=True).click())
+    page.get_by_role('button', name='智能排课', exact=True).click()
+    page.wait_for_function("JSON.parse(localStorage.getItem('atlas.workspace.v1'))?.workspaces.academic?.problem.activities.length === 0")
+    expect(page.locator('textarea')).to_have_value('')
+    assert page.evaluate("JSON.parse(localStorage.getItem('atlas.workspace.v1')).workspaces.academic.problem.activities.length") == 0
     page.locator('textarea').fill('原来的排课草稿需要保留')
     page.get_by_role('button', name='个人周计划', exact=True).click()
     academic = page.request.get(url + '/api/templates/academic').json()
@@ -118,8 +125,9 @@ with sync_playwright() as p:
     # Only this browser contains the named personal task; a second browser profile is independent.
     other = browser.new_context(viewport={'width': 1440, 'height': 1000})
     second = other.new_page()
+    second.goto(url, wait_until='networkidle', timeout=180000)
     with second.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=180000):
-        second.goto(url, wait_until='networkidle', timeout=180000)
+        second.get_by_role('button', name='体验完整示例', exact=True).click()
     second.get_by_role('button', name='求解历史', exact=True).click()
     expect(second.locator('.history-row')).to_have_count(1)
     expect(second.locator('.history-row')).not_to_contain_text('我的个人周计划')
@@ -154,8 +162,9 @@ with sync_playwright() as p:
         return set.call(this, key, value);
       };''')
     warning_page = blocked.new_page()
+    warning_page.goto(url, wait_until='networkidle', timeout=180000)
     with warning_page.expect_response(lambda r: r.url.endswith('/api/solve'), timeout=180000):
-        warning_page.goto(url, wait_until='networkidle', timeout=180000)
+        warning_page.get_by_role('button', name='体验完整示例', exact=True).click()
     expect(warning_page.locator('.local-save-status')).to_have_text('已保存在此浏览器')
     expect(warning_page.locator('.history-save-warning')).to_contain_text('未能保存求解历史')
     blocked.close()

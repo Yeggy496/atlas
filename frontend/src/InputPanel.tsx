@@ -1,4 +1,5 @@
-import { useRef, type RefObject } from "react";
+import { useRef, useState, type RefObject } from "react";
+import { describeConstraint } from "./constraintDescription";
 import {
   Sparkles,
   ArrowRight,
@@ -17,6 +18,7 @@ import {
   Play,
   ShieldCheck,
   Zap,
+  Copy,
 } from "lucide-react";
 import {
   type Problem,
@@ -36,6 +38,14 @@ interface Props {
   provider: string;
   input: string;
   setInput: (v: string) => void;
+  inputPending: boolean;
+  acknowledgeInput: () => void;
+  clearInput: () => void;
+  repeatActivity: (v: Activity) => void;
+  downloadTemplate: () => void;
+  scheduledIds: Set<string> | null;
+  weightsFailed: boolean;
+  retryConnection: () => void;
   clearContent: () => void;
   clearConstraints: () => void;
   clearActivities: () => void;
@@ -81,6 +91,7 @@ export function InputPanel({
   provider,
   input,
   setInput,
+  inputPending, acknowledgeInput, clearInput, repeatActivity, downloadTemplate, scheduledIds, weightsFailed, retryConnection,
   clearContent,
   clearConstraints,
   clearActivities,
@@ -111,6 +122,8 @@ export function InputPanel({
   importText,
 }: Props) {
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
   const inputTooLong = input.length > MAX_INPUT_CHARS;
   const activityGroups = new Map<string, Activity[]>();
   for (const a of problem?.activities ?? []) {
@@ -153,7 +166,7 @@ export function InputPanel({
           </span>
           <button
             className="parse-button"
-            disabled={!!busy || !input.trim() || !problem || inputTooLong}
+            disabled={!!busy || !input.trim() || !problem}
             onClick={parse}
           >
             {busy === "正在识别约束" ? (
@@ -161,7 +174,7 @@ export function InputPanel({
             ) : (
               <ArrowRight size={14} />
             )}
-            识别约束
+            {inputTooLong ? "识别下一段" : "识别约束"}
           </button>
         </div>
       </div>
@@ -171,7 +184,7 @@ export function InputPanel({
           type="button"
           className="clear-input-button"
           disabled={!!busy || input.length === 0}
-          onClick={() => { setInput(""); inputRef.current?.focus(); }}
+          onClick={() => { clearInput(); inputRef.current?.focus(); }}
           title="清空输入文字"
         >
           <X size={12} />
@@ -189,9 +202,13 @@ export function InputPanel({
         </button>
         </div>
         <p id="input-length-hint" className={`input-length-hint ${inputTooLong ? "too-long" : ""}`}>
-          {inputTooLong ? "文本较长，请分段识别，或精简到 4,000 字以内。" : `${input.length.toLocaleString()} / 4,000 字`}
+          {inputTooLong ? `剩余 ${input.length.toLocaleString()} 字 · 每次识别最多 4,000 字，余下文字会保留` : `${input.length.toLocaleString()} / 4,000 字`}
         </p>
       </div>
+      {inputPending && <div className="pending-input" role="status">
+        <strong>这段需求尚未纳入计划</strong><p>先点击“{inputTooLong ? "识别下一段" : "识别约束"}”，再检查新增或修改的内容。</p>
+        <button disabled={!!busy} onClick={acknowledgeInput}>本次仅使用现有任务与约束</button>
+      </div>}
       <div className="import-row">
         <button disabled={!!busy} onClick={() => fileRef.current?.click()}>
           <Upload size={14} />
@@ -205,10 +222,10 @@ export function InputPanel({
           <FileText size={14} />
           TXT / PDF
         </button>
-        <a href={`/api/import/template.csv?scenario=${scenario}`} download>
+        <button disabled={!!busy || !problem} onClick={downloadTemplate} title="下载含当前资源名称的任务模板，导入会追加活动">
           <Download size={13} />
           模板
-        </a>
+        </button>
         <input
           ref={fileRef}
           type="file"
@@ -270,6 +287,11 @@ export function InputPanel({
         </button>
       </div>
       <div className="collection-tools">
+        <input aria-label="搜索活动或约束" placeholder="搜索名称、资源或条件" value={query} onChange={(e) => setQuery(e.target.value)}/>
+        {inputTab === "activities" && <select aria-label="筛选活动" value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="all">全部活动</option><option value="required">必做活动</option><option value="optional">可选活动</option>
+          {scheduledIds && <><option value="scheduled">已安排</option><option value="unassigned">未安排</option></>}
+        </select>}
         <button
           type="button"
           disabled={!!busy || !problem || !(inputTab === "constraints" ? problem.constraints.length : problem.activities.length)}
@@ -284,7 +306,7 @@ export function InputPanel({
           还没有活动。点击上方“添加活动”，或描述本周需求后点击“识别约束”。
         </div>}
         {inputTab === "constraints"
-          ? problem?.constraints.map((c) => (
+          ? problem?.constraints.filter((c) => `${c.label} ${describeConstraint(c, problem)}`.toLowerCase().includes(query.toLowerCase())).map((c) => (
               <article className="constraint-card" key={c.id}>
                 <span
                   className={`constraint-symbol ${c.level === "soft" ? "soft" : ""}`}
@@ -296,7 +318,8 @@ export function InputPanel({
                   )}
                 </span>
                 <div>
-                  <p>{c.label}</p>
+                  <p>{describeConstraint(c, problem)}</p>
+                  {c.label !== describeConstraint(c, problem) && <p className="constraint-facts">备注：{c.label}</p>}
                   <small>
                     {c.level === "hard" ? "硬约束" : "软偏好"}
                     <span>·</span>
@@ -326,6 +349,9 @@ export function InputPanel({
               </article>
             ))
           : problem?.activities.map((a) => {
+              if (!`${a.name} ${a.resources.map((id) => problem.resources.find((r) => r.id === id)?.name ?? "").join(" ")}`.toLowerCase().includes(query.toLowerCase()) ||
+                filter === "required" && a.optional || filter === "optional" && !a.optional ||
+                filter === "scheduled" && scheduledIds && !scheduledIds.has(a.id) || filter === "unassigned" && scheduledIds?.has(a.id)) return null;
               if (a.group) {
                 if (renderedGroups.has(a.group)) return null;
                 renderedGroups.add(a.group);
@@ -370,6 +396,9 @@ export function InputPanel({
                       {a.optional ? "可选" : "必须完成"}
                     </small>
                   </div>
+                  <button
+                    className="icon-button" aria-label={`重复活动 ${a.name}`} title="复制到多个日期" disabled={!!busy} onClick={() => repeatActivity(a)}
+                  ><Copy size={13}/></button>
                   <button
                     className="icon-button"
                     aria-label={`编辑活动 ${a.name}`}
@@ -428,26 +457,27 @@ export function InputPanel({
             : mode === "balanced"
               ? "兼顾目标、时间紧凑与每日负载。"
               : "优先保留已有安排，并提前完成截止任务。"}
-          <span className="mode-hint">{reviewed ? "切换档位会立即按新偏好重新求解" : "确认任务与约束后，按所选偏好生成计划"}</span>
+          <span className="mode-hint">{reviewed && !inputPending ? "切换档位会立即按新偏好重新求解" : "识别需求并确认约束后，按所选偏好生成计划"}</span>
           {mode !== "robust" && <span className="mode-hint">需要尽量保留原安排时，可选择稳健模式。</span>}
         </p>
-        <WeightPanel
+        <details className="advanced-weights"><summary>自定义优化权重</summary>
+        {weightsFailed ? <p className="weight-empty">权重配置读取失败。<button disabled={!!busy} onClick={retryConnection}>重试</button></p> : <WeightPanel
           meta={weightsMeta}
           mode={mode}
           weights={customWeights}
           appliedWeights={appliedWeights}
-          reviewed={reviewed && !!problem?.activities.length}
+          reviewed={reviewed && !inputPending && !!problem?.activities.length}
           busy={!!busy}
           onChange={setCustomWeights}
           onApply={(override) =>
             void optimize(mode, false, override === undefined ? customWeights : override)
           }
-        />
+        />}</details>
         <label className="review-check">
           <input
             type="checkbox"
             checked={reviewed}
-            disabled={!!busy}
+            disabled={!!busy || inputPending}
             onChange={(e) => setReviewed(e.target.checked)}
           />
           <span>我已检查并确认当前任务与约束</span>
@@ -455,7 +485,7 @@ export function InputPanel({
         <button
           className="optimize-button"
           onClick={() => void optimize()}
-          disabled={!!busy || !reviewed || !problem?.activities.length}
+          disabled={!!busy || inputPending || !reviewed || !problem?.activities.length}
         >
           {busy ? (
             <>

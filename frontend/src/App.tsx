@@ -46,8 +46,11 @@ import {
 import { api, exportPlan as exportPlanRequest, readResponse } from "./api";
 import { Calendar } from "./Calendar";
 import { ActivityEditor, ConstraintEditor, Dialog } from "./Editors";
-import { readLocalWorkspaces, writeLocalWorkspaces, readWorkspaceBackup, type LocalWorkspace } from "./localWorkspace";
-import { readLocalHistory, saveLocalRun, type LocalRun } from "./localHistory";
+import { readLocalWorkspaces, writeLocalWorkspaces, readWorkspaceBackup, workspaceKey, LOCAL_WORKSPACE_KEY, type LocalWorkspace } from "./localWorkspace";
+import { readLocalHistory, saveLocalRun, deleteLocalRun, type LocalRun } from "./localHistory";
+import { describeConstraint } from "./constraintDescription";
+import { RepeatActivity } from "./RepeatActivity";
+import "./styles/product-polish.css";
 import {
   type Activity,
   type Assignment,
@@ -79,6 +82,17 @@ function mondayOf(date: string): string {
   day.setUTCDate(day.getUTCDate() - (day.getUTCDay() + 6) % 7);
   return day.toISOString().slice(0, 10);
 }
+function modelChanges(before: Problem, after: Problem): string {
+  const count = (key: "activities" | "constraints" | "resources") => {
+    const old = new Map(before[key].map((item) => [item.id, JSON.stringify(item)]));
+    const next = new Map(after[key].map((item) => [item.id, JSON.stringify(item)]));
+    const added = [...next.keys()].filter((id) => !old.has(id)).length;
+    const removed = [...old.keys()].filter((id) => !next.has(id)).length;
+    const changed = [...next].filter(([id, data]) => old.has(id) && old.get(id) !== data).length;
+    return `${key === "activities" ? "活动" : key === "constraints" ? "约束" : "资源"}：新增 ${added} / 修改 ${changed} / 移除 ${removed}`;
+  };
+  return [count("activities"), count("constraints"), count("resources")].join("；");
+}
 
 export default function App() {
   const [local] = useState(readLocalWorkspaces);
@@ -88,6 +102,17 @@ export default function App() {
   const [saveWarning, setSaveWarning] = useState("");
   const [historyWarning, setHistoryWarning] = useState("");
   const [locallySaved, setLocallySaved] = useState(!!initial);
+  const knownCopies = useRef(Object.fromEntries(Object.entries(local.store.workspaces).map(([s, saved]) => [s, workspaceKey(saved)])));
+  const [storageConflict, setStorageConflict] = useState<{ latest: LocalWorkspace | null } | null>(null);
+  const [onboarding, setOnboarding] = useState(!initial);
+  const [repeatActivity, setRepeatActivity] = useState<Activity | null>(null);
+  const [appliedInput, setAppliedInput] = useState(initial?.appliedInput ?? (initial?.input === SCENARIOS[local.store.active_scenario].input ? initial.input : ""));
+  const modelEpoch = useRef(0);
+  const validationCounter = useRef(0);
+  const [connectionFailed, setConnectionFailed] = useState(false);
+  const [weightsFailed, setWeightsFailed] = useState(false);
+  const explanationCache = useRef(new Map<string, Explanation>());
+  const selectedKey = useRef("");
   const [problem, setProblem] = useState<Problem | null>(initial?.problem ?? null),
     [result, setResult] = useState<Result | null>(initial?.result ?? null);
   const [scenario, setScenario] = useState<Scenario>(local.store.active_scenario),
@@ -116,7 +141,12 @@ export default function App() {
     [history, setHistory] = useState<LocalRun[]>([]);
   const [resourcesOpen, setResourcesOpen] = useState(false);
   const [confirmation, setConfirmation] = useState<ReplacementAction | LocalWorkspace | null>(null);
-  const [undo, setUndo] = useState<{ restore: LocalWorkspace; removeScenario?: Scenario } | null>(null);
+  type UndoEntry = { restore: LocalWorkspace; removeScenario?: Scenario };
+  const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
+  const undo = undoStack.at(-1) ?? null;
+  function setUndo(entry: UndoEntry | null) {
+    setUndoStack((current) => !entry ? [] : current.at(-1)?.restore === entry.restore && current.at(-1)?.removeScenario === entry.removeScenario ? current : [...current, entry].slice(-10));
+  }
   const [baseline, setBaseline] = useState<PlanBaseline | null>(null);
   const [constraintEditor, setConstraintEditor] = useState<
       Constraint | "new" | null
@@ -137,11 +167,12 @@ export default function App() {
   const snapshot = useRef<LocalWorkspace | null>(null);
   const canSave = useRef(false);
   snapshot.current = problem && problem.scenario === scenario ? {
-    problem, result, previous: previous.current, input, mode, customWeights,
+    problem, result, previous: previous.current, input, appliedInput, mode, customWeights,
     reviewed, summary, warnings, inputTab, view,
     ...(previousProblem.current ? { previousProblem: previousProblem.current } : {}),
   } : null;
   canSave.current = localReady;
+  selectedKey.current = result && selected ? `${result.run_id}:${selected.activity_id}` : "";
 
   function saveLocal() {
     const current = snapshot.current;
@@ -149,22 +180,40 @@ export default function App() {
     const s = current.problem.scenario;
     // Another tab may have edited a different scenario since this tab opened.
     // Only replace this workspace; keep the latest stored copies of the others.
-    const latest = readLocalWorkspaces().store.workspaces;
+    const latestStore = readLocalWorkspaces().store;
+    const latest = latestStore.workspaces;
+    const savedKey = workspaceKey(latest[s]);
+    const knownKey = knownCopies.current[s] ?? "";
+    if (savedKey !== knownKey && savedKey !== workspaceKey(current)) {
+      setStorageConflict({ latest: latest[s] ?? null });
+      setLocallySaved(false);
+      setSaveWarning("另一个标签页更新了此计划，当前编辑尚未覆盖它。请选择保留哪一份，或先备份当前内容。");
+      return;
+    }
+    if (savedKey === workspaceKey(current)) {
+      knownCopies.current[s] = savedKey;
+      localStore.current = { ...latestStore, active_scenario: s };
+      const warning = latestStore.active_scenario !== s ? writeLocalWorkspaces(localStore.current) : "";
+      setSaveWarning(warning); setLocallySaved(!warning); return;
+    }
     localStore.current = {
       ...localStore.current, active_scenario: s,
       workspaces: { ...localStore.current.workspaces, ...latest, [s]: current },
     };
     const warning = writeLocalWorkspaces(localStore.current);
+    if (!warning) knownCopies.current[s] = workspaceKey(current);
     setSaveWarning(warning);
     setLocallySaved(!warning);
   }
   function restoreLocal(saved: LocalWorkspace) {
+    modelEpoch.current += 1;
     setProblem(saved.problem);
     setResult(saved.result);
     previous.current = saved.previous;
     previousProblem.current = saved.previousProblem ?? saved.problem;
     setScenario(saved.problem.scenario);
     setInput(saved.input);
+    setAppliedInput(saved.appliedInput ?? (saved.input === SCENARIOS[saved.problem.scenario].input ? saved.input : ""));
     setMode(saved.mode);
     setCustomWeights(saved.customWeights);
     setReviewed(saved.reviewed);
@@ -174,6 +223,15 @@ export default function App() {
     setView(saved.view);
     setLocalReady(true);
     setBaseline(null);
+  }
+  function resolveStorageConflict(useLatest: boolean) {
+    if (!snapshot.current) return;
+    const s = snapshot.current.problem.scenario;
+    const latest = readLocalWorkspaces().store.workspaces[s];
+    knownCopies.current[s] = workspaceKey(latest);
+    setStorageConflict(null); setSaveWarning("");
+    if (useLatest && latest) { restoreLocal(latest); setNotice("已打开另一个标签页保存的最新内容。"); }
+    else { saveLocal(); setNotice("已用当前内容保存。另一个标签页会收到更新提示。"); }
   }
   function rememberRun(p: Problem, r: Result, selectedMode: Mode = mode, weights = customWeights) {
     const saved = snapshot.current;
@@ -199,13 +257,13 @@ export default function App() {
       localStore.current = store;
       setSaveWarning(writeLocalWorkspaces(store));
     }
-    restoreLocal(undo.restore); setUndo(null); setError("");
+    restoreLocal(undo.restore); setUndoStack((current) => current.slice(0, -1)); setError("");
     setNotice("已撤销上一次内容修改。");
   }
   // Save edits, including unparsed text and unconfirmed drafts. Do not save a
   // half-switched template or overwrite another scenario's workspace.
   useEffect(saveLocal, [localReady, scenario, problem, result, input, mode,
-    customWeights, reviewed, summary, warnings, inputTab, view]);
+    customWeights, reviewed, summary, warnings, inputTab, view, appliedInput]);
   useEffect(() => {
     const flush = () => saveLocal();
     const hidden = () => { if (document.visibilityState === "hidden") flush(); };
@@ -216,28 +274,57 @@ export default function App() {
       document.removeEventListener("visibilitychange", hidden);
     };
   }, []);
+  useEffect(() => {
+    const changed = (event: StorageEvent) => {
+      if ((event.key !== LOCAL_WORKSPACE_KEY && event.key !== null) || !snapshot.current) return;
+      const s = snapshot.current.problem.scenario;
+      const latest = readLocalWorkspaces().store.workspaces[s];
+      if (workspaceKey(latest) !== (knownCopies.current[s] ?? "") && workspaceKey(latest) !== workspaceKey(snapshot.current)) {
+        setStorageConflict({ latest: latest ?? null }); setLocallySaved(false);
+        setSaveWarning("另一个标签页更新了此计划，当前编辑尚未覆盖它。请选择保留哪一份，或先备份当前内容。");
+      }
+    };
+    window.addEventListener("storage", changed);
+    return () => window.removeEventListener("storage", changed);
+  }, []);
 
   async function load(s: Scenario, reset = false) {
+    if (storageConflict) { setError("请先处理多标签页更新提示，再切换场景；可先下载当前备份。"); return; }
     saveLocal();
+    modelEpoch.current += 1;
+    setStorageConflict(null); setSaveWarning("");
+    setConstraintEditor(null); setAddingActivity(false); setEditingActivity(null); setResourcesOpen(false);
     if (!reset) setUndo(null);
     const version = ++loadCounter.current;
     setSelected(null);
     setPage("workspace");
     setError("");
-    const saved = !reset && localStore.current.workspaces[s];
+    const latest = readLocalWorkspaces().store;
+    localStore.current = latest;
+    const saved = !reset && latest.workspaces[s];
+    knownCopies.current[s] = workspaceKey(latest.workspaces[s]);
     if (saved) {
       restoreLocal(saved);
       setNotice("已恢复此浏览器上次保存的内容。");
       return;
     }
     setLocalReady(false);
-    setBusy("正在生成预置方案");
+    setBusy(reset ? "正在生成预置方案" : "正在准备工作空间");
     setNotice("");
     try {
       const p = await api<Problem>(`/templates/${s}`);
       if (version !== loadCounter.current) return;
+      p.week_start = mondayOf(new Date().toLocaleDateString("sv-SE"));
+      if (!reset) {
+        restoreLocal({ problem: { ...p, name: `我的${SCENARIOS[s].title}`, activities: [], constraints: [] },
+          result: null, previous: [], input: "", appliedInput: "", mode: "balanced", customWeights: null,
+          reviewed: false, summary: [], warnings: [], inputTab: "activities", view: "calendar" });
+        setNotice("从自己的任务开始，或点击“恢复预置方案”体验完整示例。");
+        return;
+      }
       restoreLocal({
         problem: p, result: null, previous: [], input: SCENARIOS[s].input,
+        appliedInput: SCENARIOS[s].input,
         mode: "balanced", customWeights: null, reviewed: true,
         summary: [], warnings: [], inputTab: "constraints", view: "calendar",
       });
@@ -265,11 +352,11 @@ export default function App() {
   useEffect(() => {
     api<{ provider: string; version: string }>("/health")
       .then((x) => { setProvider(x.provider); setVersion(x.version); setConnected(true); })
-      .catch(() => setError("暂时无法连接后端，请确认服务已启动。"));
+      .catch(() => { setConnectionFailed(true); setError("暂时无法连接后端，请稍后点击重试连接。"); });
     // Weight dimensions come from the solver so the UI never hard-codes them.
     api<WeightsMeta>("/weights")
       .then((x) => setWeightsMeta(x))
-      .catch(() => setWeightsMeta(null));
+      .catch(() => { setWeightsMeta(null); setWeightsFailed(true); });
     if (initial) setNotice(local.warning || "已恢复此浏览器上次保存的内容。");
     else void load(local.store.active_scenario).then(() => {
       if (local.warning) setNotice(local.warning);
@@ -292,6 +379,9 @@ export default function App() {
       return;
     }
     let cancelled = false;
+    const cacheKey = `${result.run_id}:${selected.activity_id}`;
+    const cached = explanationCache.current.get(cacheKey);
+    if (cached) { setExplanation(cached); setExplainBusy(false); return; }
     setExplainBusy(true);
     setExplanation(null);
     api<Explanation>("/explain", {
@@ -299,9 +389,10 @@ export default function App() {
       assignments: result.assignments,
       activity_id: selected.activity_id,
       previous: [],
+      include_narrative: false,
     })
       .then((data) => {
-        if (!cancelled) setExplanation(data);
+        if (!cancelled) { setExplanation(data); explanationCache.current.set(cacheKey, data); }
       })
       .catch(() => {
         if (!cancelled) setExplanation(null);
@@ -314,6 +405,7 @@ export default function App() {
     };
   }, [selected, problem, result]);
   function draft(p: Problem | ((current: Problem | null) => Problem | null)) {
+    modelEpoch.current += 1;
     if (snapshot.current) setUndo({ restore: snapshot.current });
     setProblem(p);
     setResult(null);
@@ -321,6 +413,42 @@ export default function App() {
     setError("");
     setSelected(null);
     setBaseline(null);
+  }
+  async function narrateSelected() {
+    if (!selected || !problem || !result || explainBusy) return;
+    const cacheKey = `${result.run_id}:${selected.activity_id}`;
+    const epoch = modelEpoch.current;
+    setExplainBusy(true);
+    try {
+      const data = await api<Explanation>("/explain", { problem, assignments: result.assignments, activity_id: selected.activity_id, previous: previous.current });
+      explanationCache.current.set(cacheKey, data);
+      if (epoch === modelEpoch.current && selectedKey.current === cacheKey) setExplanation(data);
+      if (!data.narrative) setNotice("AI 说明暂不可用，已保留真实约束与求解依据。");
+    } catch { setNotice("AI 说明暂不可用，当前计划与求解依据仍可查看。"); }
+    finally { if (selectedKey.current === cacheKey) setExplainBusy(false); }
+  }
+  async function validateDraft(p: Problem): Promise<boolean> {
+    const request = ++validationCounter.current;
+    const epoch = modelEpoch.current;
+    setBusy("正在保存修改");
+    try {
+      await api("/constraints/validate", p);
+      if (request !== validationCounter.current || epoch !== modelEpoch.current) return false;
+      draft(p); return true;
+    } finally { if (request === validationCounter.current) setBusy(""); }
+  }
+  const inputPending = !!input.trim() && input !== appliedInput;
+  function clearInput() {
+    if (snapshot.current) setUndo({ restore: snapshot.current });
+    setInput("");
+  }
+  async function reconnect() {
+    setConnectionFailed(false);
+    try {
+      const [health, weights] = await Promise.all([api<{ provider: string; version: string }>("/health"), api<WeightsMeta>("/weights")]);
+      setProvider(health.provider); setVersion(health.version); setWeightsMeta(weights);
+      setConnected(true); setWeightsFailed(false); setError("");
+    } catch (e) { setConnected(false); setConnectionFailed(true); setError((e as Error).message); }
   }
   async function optimize(
     selectedMode: Mode = mode,
@@ -330,7 +458,9 @@ export default function App() {
     // custom weights) must pass it here instead of relying on the closure.
     weightsOverride?: Record<string, number> | null,
   ) {
-    if (!problem || !reviewed || !problem.activities.length) return;
+    if (storageConflict) { setError("请先处理另一个标签页的更新提示，再生成计划。"); return; }
+    if (!problem || !reviewed || !problem.activities.length || inputPending || busy) return;
+    const epoch = modelEpoch.current;
     const effectiveWeights =
       weightsOverride === undefined ? customWeights : weightsOverride;
     setBusy("正在组合优化");
@@ -345,8 +475,10 @@ export default function App() {
         previous: fresh ? [] : previous.current,
         ...(effectiveWeights ? { weights: effectiveWeights } : {}),
       });
+      if (epoch !== modelEpoch.current) return;
       setResult(r);
       setBaseline(before);
+      if (window.matchMedia("(max-width: 760px)").matches) requestAnimationFrame(() => document.querySelector(".result-column")?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" }));
       rememberRun(problem, r, selectedMode, effectiveWeights);
       if (r.assignments.length) { previous.current = r.assignments; previousProblem.current = problem; }
       if (r.status === "INFEASIBLE")
@@ -363,11 +495,15 @@ export default function App() {
     }
   }
   async function parse() {
-    if (!problem) return;
+    if (!problem || busy) return;
+    const epoch = modelEpoch.current;
+    let splitAt = Math.min(input.length, MAX_INPUT_CHARS);
     if (input.length > MAX_INPUT_CHARS) {
-      setError("每次最多识别 4,000 字，请分段输入或精简文本。");
-      return;
+      const newline = input.lastIndexOf("\n", splitAt);
+      if (newline > MAX_INPUT_CHARS / 2) splitAt = newline + 1;
     }
+    const segment = input.slice(0, splitAt);
+    const remainder = input.slice(splitAt);
     setBusy("正在识别约束");
     setError("");
     try {
@@ -376,9 +512,13 @@ export default function App() {
         summary: string[];
         warnings: string[];
         provider: string;
-      }>("/constraints/parse", { problem, text: input });
+      }>("/constraints/parse", { problem, text: segment });
+      if (epoch !== modelEpoch.current) return;
+      const changes = modelChanges(problem, data.problem);
       draft(data.problem);
-      setSummary(data.summary);
+      setAppliedInput(segment);
+      if (remainder.trim()) { setInput(remainder); setAppliedInput(""); }
+      setSummary([changes, ...(remainder.trim() ? [`本段已识别 ${segment.length} 字，剩余 ${remainder.length} 字仍在输入框中，请继续识别。`] : []), ...data.summary]);
       setWarnings(data.warnings);
       setProvider(data.provider);
       setInputTab("constraints");
@@ -391,6 +531,7 @@ export default function App() {
   }
   async function importFile(file: File) {
     if (!problem) return;
+    const epoch = modelEpoch.current;
     setBusy("正在读取文件");
     setError("");
     try {
@@ -401,11 +542,12 @@ export default function App() {
         method: "POST",
         body: form,
       });
-      const data = await readResponse<{ problem: Problem; summary: string[] }>(response);
+      const data = await readResponse<{ problem: Problem; summary: string[]; duplicate_candidates?: number; warnings?: string[] }>(response);
+      if (epoch !== modelEpoch.current) return;
       draft(data.problem);
-      setSummary(data.summary);
-      setWarnings([]);
-      setNotice("导入完成，请检查并确认新活动。");
+      setSummary([modelChanges(problem, data.problem), "文件中的活动已追加到当前计划，原有活动已保留。", ...data.summary]);
+      setWarnings(data.warnings ?? (data.duplicate_candidates ? [`发现 ${data.duplicate_candidates} 行与已有活动可能重复，请检查后删除不需要的条目。`] : []));
+      setNotice("已追加导入，请检查并确认新活动。");
       setInputTab("activities");
     } catch (e) {
       setError((e as Error).message);
@@ -454,6 +596,8 @@ export default function App() {
         previous: previous.current,
         constraint_id,
       });
+      if (snapshot.current) setUndo({ restore: snapshot.current });
+      modelEpoch.current += 1;
       setProblem(data.problem);
       setResult(data.result);
       setBaseline({ problem: previousProblem.current ?? problem, assignments: [...previous.current] });
@@ -485,6 +629,16 @@ export default function App() {
     URL.revokeObjectURL(url);
     setNotice("已下载工作空间备份，可在另一台电脑恢复。");
   }
+  function downloadTemplate() {
+    if (!problem) return;
+    const primary = problem.resources.find((r) => r.type === (scenario === "academic" ? "class" : scenario === "production" ? "machine" : scenario === "lab" ? "team" : "person")) ?? problem.resources[0];
+    const csv = (value: string) => `"${value.replaceAll('"', '""')}"`;
+    const rows = ["name,duration_minutes,category,resources,day,start",
+      ["我的新活动", "60", scenario === "academic" ? "course" : scenario === "lab" ? "experiment" : scenario === "production" ? "operation" : scenario === "meeting" ? "meeting" : "study", primary?.id ?? "", "1", "09:00"].map(csv).join(",")];
+    const url = URL.createObjectURL(new Blob(["\uFEFF" + rows.join("\n")], { type: "text/csv;charset=utf-8" }));
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `atlas-${scenario}-template.csv`; anchor.click(); URL.revokeObjectURL(url);
+    setNotice("模板已包含当前资源 ID。resources 列也可填资源名称，多个资源用 | 分隔；day 为 1–7，start 留空表示灵活安排。导入会追加活动。");
+  }
   async function importBackup(file: File) {
     setError(""); setBusy("正在检查备份");
     try {
@@ -512,6 +666,7 @@ export default function App() {
       restoreLocal({ ...saved,
         problem: { ...problem, activities: clearingActivities ? [] : problem.activities, constraints: remainingConstraints },
         input: action === "clear-all" ? "" : saved.input,
+        appliedInput: action === "clear-all" ? "" : saved.appliedInput,
         result: null, previous: clearingActivities ? [] : saved.previous,
         ...(clearingActivities ? { previousProblem: { ...problem, activities: [], constraints: remainingConstraints } } : {}),
         reviewed: false, summary: [], warnings: [],
@@ -521,13 +676,13 @@ export default function App() {
     } else if (action === "blank") {
       restoreLocal({ problem: { ...problem, name: `我的${SCENARIOS[scenario].title}`,
         week_start: mondayOf(new Date().toLocaleDateString("sv-SE")), activities: [], constraints: [] },
-        result: null, previous: [], input: "", mode: "balanced", customWeights: null,
+        result: null, previous: [], input: "", appliedInput: "", mode: "balanced", customWeights: null,
         reviewed: false, summary: [], warnings: [], inputTab: "activities", view: "calendar" });
       setNotice("已新建自己的计划。添加活动或描述需求，然后确认并生成安排。");
     } else {
       // A downloaded JSON cannot establish solver correctness or user approval.
       restoreLocal({ ...action, result: null, reviewed: false,
-        previous: action.result?.assignments ?? action.previous });
+        previous: action.result?.assignments.length ? action.result.assignments : action.previous });
       setSummary(["已恢复备份中的任务与约束，请检查后确认并重新求解。"]);
       setNotice("备份已恢复；确认后重新生成合法计划。");
     }
@@ -537,7 +692,7 @@ export default function App() {
     const next = mondayOf(value);
     if (next === problem.week_start) return;
     const p = { ...problem, week_start: next };
-    try { await api("/constraints/validate", p); draft(p); setNotice("已切换到所选日期所在周，请确认并重新生成计划。"); }
+    try { if (await validateDraft(p)) setNotice("已切换到所选日期所在周，请确认并重新生成计划。"); }
     catch (e) { setError((e as Error).message); }
   }
   function deleteConstraint(c: Constraint) {
@@ -693,7 +848,7 @@ export default function App() {
           <div className="topbar-right">
             <span className={`engine-health ${connected ? "" : "disconnected"}`}>
               <span />
-              {connected ? "CP-SAT 引擎已连接" : "正在连接服务"}
+              {connected ? "CP-SAT 引擎已连接" : connectionFailed ? "服务未连接" : "正在连接服务"}
             </span>
             <span className="provider-badge">{provider === "demo" ? "规则解析" : provider === "deepseek" ? "DeepSeek" : "OpenAI"}</span>
             <button
@@ -760,8 +915,14 @@ export default function App() {
               </button>
             </div>
           </section>
+          <nav className="mobile-workspace-nav" aria-label="工作空间页面">
+            <button className={page === "workspace" ? "active" : ""} disabled={!!busy} onClick={() => setPage("workspace")}><LayoutDashboard size={16}/>工作台</button>
+            <button className={page === "history" ? "active" : ""} disabled={!!busy} onClick={openHistory}><History size={16}/>求解历史</button>
+          </nav>
           {page === "workspace" && problem && <>
             <div className="workspace-tools">
+              <label className="plan-name">计划名称 <input aria-label="计划名称" maxLength={120} value={problem.name} disabled={!!busy}
+                onChange={(e) => { modelEpoch.current += 1; setProblem({ ...problem, name: e.target.value }); }} /></label>
               <label>所在周 <input aria-label="选择计划所在周" type="date" value={problem.week_start} disabled={!!busy}
                 onChange={(e) => void changeWeek(e.target.value)} /></label>
               <div>
@@ -773,9 +934,9 @@ export default function App() {
             </div>
             <div className="workflow-progress" aria-label="计划生成步骤">
               <span className={problem.activities.length ? "done" : "current"}><i>1</i>添加任务与需求</span>
-              <ChevronRight size={14}/><span className={reviewed ? "done" : "current"}><i>2</i>{reviewed ? "约束已确认" : "检查并确认约束"}</span>
+              <ChevronRight size={14}/><span className={reviewed && !inputPending ? "done" : "current"}><i>2</i>{inputPending ? "需求尚待识别" : reviewed ? "约束已确认" : "检查并确认约束"}</span>
               <ChevronRight size={14}/><span className={result?.assignments.length ? "done" : ""}><i>3</i>生成与调整计划</span>
-              {undo && <button disabled={!!busy} onClick={undoChange}><RotateCcw size={13}/>撤销修改</button>}
+              {undo && <button disabled={!!busy} onClick={undoChange} title={`可撤销本次打开后的最近 ${undoStack.length} 次内容修改，最多保留 10 步`}><RotateCcw size={13}/>撤销修改</button>}
             </div>
           </>}
           <input ref={backupFileRef} type="file" accept=".json" aria-label="选择工作空间备份" hidden
@@ -785,6 +946,8 @@ export default function App() {
             <div className="message error" role="alert">
               <AlertTriangle size={17} />
               <span>{error}</span>
+              {connectionFailed && <button onClick={() => void reconnect()}>重试连接</button>}
+              {!problem && <button disabled={!!busy} onClick={() => void load(scenario)}>重新载入工作空间</button>}
               <button onClick={() => setError("")} aria-label="关闭错误">
                 <X size={15} />
               </button>
@@ -794,10 +957,11 @@ export default function App() {
             <div className="message error storage-warning" role="alert">
               <AlertTriangle size={17} />
               <span>{saveWarning}</span>
+              {storageConflict && <div className="storage-conflict-actions"><button disabled={!!busy || !storageConflict.latest} onClick={() => resolveStorageConflict(true)}>打开最新内容</button><button disabled={!!busy} onClick={() => resolveStorageConflict(false)}>保留当前编辑</button><button onClick={backupWorkspace}>先备份当前内容</button></div>}
             </div>
           )}
           {historyWarning && <div className="message error history-save-warning" role="alert"><AlertTriangle size={17}/><span>{historyWarning}</span></div>}
-          {notice && !constraintEditor && !addingActivity && !editingActivity && !resourcesOpen && !help && !confirmation && !selected && (
+          {notice && !constraintEditor && !addingActivity && !editingActivity && !resourcesOpen && !help && !confirmation && !selected && !repeatActivity && !onboarding && (
             <div className="toast" role="status">
               <CheckCircle2 size={17} />
               {notice}
@@ -819,6 +983,7 @@ export default function App() {
                 </div>
               ) : (
                 history.map((h) => h.workspace.result && (
+                  <div className="history-entry" key={h.id}>
                   <button
                     className="history-row"
                     key={h.id}
@@ -838,7 +1003,7 @@ export default function App() {
                       <strong>{h.workspace.problem.name}</strong>
                       <small>
                         {new Date(h.created_at).toLocaleString("zh-CN")} ·{" "}
-                        {h.workspace.result.metrics.activities} 项活动
+                        {h.workspace.result.metrics.activities} 项活动 · {h.workspace.problem.week_start} 所在周 · {{ efficient: "高效", balanced: "均衡", robust: "稳健" }[h.workspace.mode]}
                       </small>
                     </div>
                     <span
@@ -849,6 +1014,10 @@ export default function App() {
                     <span>{h.workspace.result.metrics.solve_time}s</span>
                     <ChevronRight size={18} />
                   </button>
+                  <button className="icon-button history-delete" disabled={!!busy} aria-label={`删除历史 ${h.workspace.problem.name}`} onClick={() => {
+                    const warning = deleteLocalRun(h.id); setHistoryWarning(warning); setHistory(readLocalHistory());
+                    if (!warning) setNotice("已删除这条历史记录，当前计划仍保留。");
+                  }}><Trash2 size={16}/></button></div>
                 ))
               )}
             </section>
@@ -919,6 +1088,14 @@ export default function App() {
                   provider={provider}
                   input={input}
                   setInput={setInput}
+                  inputPending={inputPending}
+                  acknowledgeInput={() => { setAppliedInput(input); setNotice("已选择只使用现有任务与约束；输入文字未纳入本次计划。"); }}
+                  clearInput={clearInput}
+                  repeatActivity={setRepeatActivity}
+                  downloadTemplate={downloadTemplate}
+                  scheduledIds={result && ["FEASIBLE", "OPTIMAL"].includes(result.status) ? new Set(result.assignments.map((a) => a.activity_id)) : null}
+                  weightsFailed={weightsFailed}
+                  retryConnection={() => void reconnect()}
                   clearContent={() => setConfirmation("clear-all")}
                   clearConstraints={() => setConfirmation("clear-constraints")}
                   clearActivities={() => setConfirmation("clear-activities")}
@@ -949,6 +1126,7 @@ export default function App() {
                   importText={importText}
                 />
                 <div className="result-column">
+                <button className="mobile-plan-shortcut" onClick={() => document.querySelector(".input-panel")?.scrollIntoView({ behavior: "smooth", block: "start" })}><Pencil size={14}/>返回编辑任务与需求</button>
                 {baseline && problem && result && <PlanChanges before={baseline} problem={problem} result={result}/>}
                 <ResultPanel
                   problem={problem}
@@ -981,10 +1159,22 @@ export default function App() {
           )}
         </main>
       </div>
-      {problem && resourcesOpen && <Dialog title="管理资源" onClose={() => { if (!busy) setResourcesOpen(false); }}>
+      {onboarding && problem && <Dialog title="开始安排你的时间" onClose={() => setOnboarding(false)}>
+        <div className="welcome-content"><span className="welcome-mark">Σ</span><h3>把需求变成可执行的计划</h3>
+          <p>添加自己的任务，或用示例看看效果。内容会保存在此浏览器，下次回来可以继续。</p>
+          <div className="welcome-options"><button className="primary" disabled={!!busy} onClick={() => { setOnboarding(false); setAddingActivity(true); }}>从我的第一个任务开始<ArrowRight size={16}/></button>
+            <button className="secondary" disabled={!!busy} onClick={() => { setOnboarding(false); void load(scenario, true); }}>体验完整示例</button></div>
+          <small>AI 理解需求 · 约束检查 · CP-SAT 生成合法安排</small>
+        </div>
+      </Dialog>}
+      {problem && repeatActivity && <RepeatActivity activity={repeatActivity} problem={problem} onClose={() => { modelEpoch.current += 1; setRepeatActivity(null); }}
+        onSave={async (activities, constraints) => { if (await validateDraft({ ...problem, activities: [...problem.activities, ...activities], constraints: [...problem.constraints, ...constraints] })) {
+          setRepeatActivity(null); setInputTab("activities"); setNotice(`已新增 ${activities.length} 项重复活动，请检查并确认。`);
+        } }}/ >}
+      {problem && resourcesOpen && <Dialog title="管理资源" onClose={() => { if (!busy) { modelEpoch.current += 1; setResourcesOpen(false); } }}>
         <ResourceManager problem={problem} busy={!!busy} onSave={async (resources) => {
           const p = { ...problem, resources };
-          await api("/constraints/validate", p); draft(p); setResourcesOpen(false);
+          if (!await validateDraft(p)) return; setResourcesOpen(false);
           setNotice("资源已更新，请确认约束并重新生成计划。");
         }}/>
       </Dialog>}
@@ -1009,7 +1199,7 @@ export default function App() {
           problem={problem}
           initial={constraintEditor === "new" ? undefined : constraintEditor}
           error={error}
-          onClose={() => { setError(""); setConstraintEditor(null); }}
+          onClose={() => { modelEpoch.current += 1; setError(""); setConstraintEditor(null); }}
           onSave={async (c) => {
             if (!c.label.trim()) { setError("请输入约束说明，不能只填写空格。"); return; }
             setError("");
@@ -1021,8 +1211,7 @@ export default function App() {
                   c,
                 ],
               };
-              await api("/constraints/validate", p);
-              draft(p);
+              if (!await validateDraft(p)) return;
               setConstraintEditor(null);
             } catch (e) {
               setError((e as Error).message);
@@ -1036,6 +1225,7 @@ export default function App() {
           initial={editingActivity ?? undefined}
           error={error}
           onClose={() => {
+            modelEpoch.current += 1;
             setError("");
             setAddingActivity(false);
             setEditingActivity(null);
@@ -1061,8 +1251,7 @@ export default function App() {
                 activities,
                 constraints: c ? [...constraints, c] : constraints,
               };
-              await api("/constraints/validate", p);
-              draft(p);
+              if (!await validateDraft(p)) return;
               setAddingActivity(false);
               setEditingActivity(null);
               setInputTab("activities");
@@ -1088,10 +1277,23 @@ export default function App() {
               连续 {(selected.end - selected.start) / 2} 小时 ·{" "}
               {active.optional ? "可选活动" : "必须完成"}
             </p>
+            <div className="event-detail-actions">
+              <button className="secondary" disabled={!!busy} onClick={() => { setSelected(null); setEditingActivity(active); setError(""); }}><Pencil size={15}/>编辑活动</button>
+              <button className="secondary" disabled={!!busy} onClick={() => { setSelected(null); setRepeatActivity(active); }}>重复到其他日期</button>
+              <button className="secondary" disabled={!!busy} onClick={() => {
+                const fixed = problem.constraints.find((c) => c.type === "fixed_time" && c.target === active.id);
+                draft({ ...problem, constraints: fixed ? problem.constraints.filter((c) => !(c.type === "fixed_time" && c.target === active.id)) : [...problem.constraints,
+                  { id: crypto.randomUUID().slice(0, 8), label: `${active.name} · 固定当前安排`, type: "fixed_time", target: active.id, level: "hard", day: Math.floor(selected.start / 48), start: selected.start % 48, end: 48, other: null, value: 1, source: "manual" }] });
+                setNotice(fixed ? "已解除固定时间，请确认并重新优化。" : "已将当前安排固定，请确认约束。");
+              }}><LockKeyhole size={15}/>{problem.constraints.some((c) => c.type === "fixed_time" && c.target === active.id) ? "解除固定时间" : "固定当前时间"}</button>
+            </div>
             <h4>
               <Sparkles size={16} />
               为什么排在这个时间？
             </h4>
+            {provider !== "demo" && !explanation?.narrative && <button className="secondary" disabled={explainBusy || !explanation} onClick={() => void narrateSelected()}>
+              {explainBusy ? <Loader2 size={14} className="spin"/> : <Sparkles size={14}/>} {explainBusy ? "正在生成说明…" : "用 AI 解读安排依据"}
+            </button>}
             {explanation?.narrative && (
               <div className="narrative">
                 <p>{explanation.narrative.headline}</p>
@@ -1152,7 +1354,7 @@ export default function App() {
                   )
                   .map((c) => (
                     <li key={c.id}>
-                      {c.label}
+                      {describeConstraint(c, problem)}
                       {c.level === "soft"
                         ? "（优化偏好）"
                         : "（硬约束已通过）"}
@@ -1175,6 +1377,7 @@ export default function App() {
               工作内容自动保存在当前浏览器，刷新、重新打开及切换场景时会恢复上次内容。
               点击“恢复预置方案”只会替换当前场景的内容。不同电脑或浏览器各自保存，不会自动同步；清除网站数据或结束无痕浏览会丢失本地保存。
               使用“备份工作空间”下载 JSON 文件，在其他电脑点击“恢复备份”即可继续编辑。求解历史仅保存在此浏览器；任务与约束会提交服务器求解，使用 AI 识别时也会提交给模型服务。
+              内容修改可撤销最近 10 步；刷新或切换场景后撤销记录清空，已保存的工作内容仍会恢复。
             </div>
             <ol>
               <li>
