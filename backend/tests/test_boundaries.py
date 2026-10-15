@@ -75,6 +75,8 @@ def test_model_http_errors_identify_status_without_leaking_secrets(status):
     assert f'HTTP {status}' in message
     assert 'SECRET_TEST_VALUE' not in message
     assert 'example.invalid' not in message
+    if status >= 500:
+        assert '稍后重试' in message and '手工编辑和求解' in message
 
 
 def test_model_tls_and_timeout_errors_are_distinguishable():

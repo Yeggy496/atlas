@@ -33,6 +33,7 @@ def parse_failure_message(error: Exception) -> str:
         status = error.response.status_code
         hint = ('请检查密钥权限或网关访问限制。' if status in (401, 403) else
                 '请求频率或额度受限，请稍后重试。' if status == 429 else
+                '模型服务暂时繁忙或不可用，请稍后重试；当前任务仍可手工编辑和求解。' if status >= 500 else
                 '请检查接口地址、模型名称及网关支持的请求格式。')
         return f'{prefix}模型接口返回 HTTP {status}。{hint}'
     if isinstance(error, httpx.TimeoutException):
