@@ -16,6 +16,7 @@ import json
 import os
 
 import httpx
+from .model_http import model_client
 
 from ..solver.explain import explain
 from .providers import request_options
@@ -64,7 +65,7 @@ class LLMExplanation:
                    'candidate_slots_same_day': facts.get('candidate_slots_same_day'),
                    'reasons': [{'kind': r.get('kind'), 'title': r.get('title'), 'detail': r.get('detail')}
                                for r in facts.get('reasons', [])]}
-        with httpx.Client(timeout=timeout) as client:
+        with model_client(timeout) as client:
             response = client.post(base + '/chat/completions',
                                    headers={'Authorization': f'Bearer {key}'},
                                    json={'model': model, 'temperature': 0,

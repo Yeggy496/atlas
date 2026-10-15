@@ -13,5 +13,6 @@ Reproduced issues were fixed without replacing the shared solver or adding runti
 - Saving one scene cannot resurrect another scene deleted by a different tab.
 - Repeat dialogs protect selected dates, respect activity/constraint limits and handle long task names.
 - Expensive solves/diagnoses and model requests have independent bounded admission. Overload returns a friendly HTTP 429 and retry hint instead of accumulating unlimited concurrent work; slots are released after errors. Deterministic explanations remain available when model capacity is occupied.
+- Model response bodies also have a total deadline, so periodic keep-alive bytes cannot indefinitely extend an inactivity timeout and occupy all model slots.
 
 The baseline failures were reproduced in isolated Chromium sessions. Regression tests exercise real import, validation and solver endpoints; busy-network, timeout and storage-quota cases are simulated explicitly. Existing 30-minute, one-day-interval and browser-local persistence boundaries remain unchanged.

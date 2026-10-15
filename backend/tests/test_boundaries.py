@@ -170,6 +170,8 @@ def test_api_provider_honours_base_url_and_timeout_overrides(monkeypatch):
         client = model_client.return_value.__enter__.return_value
         client.post.return_value = response
         APIProvider('openai').parse_constraints(problem, '保持原任务')
-    assert model_client.call_args.kwargs['timeout'] == 120.0
+    configured = model_client.call_args.kwargs['timeout']
+    assert configured.read == 120.0
+    assert configured.connect == 10
     posted_url = client.post.call_args.args[0]
     assert posted_url == 'https://gateway.example/v1/chat/completions'
