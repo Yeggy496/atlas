@@ -131,7 +131,7 @@ export function ResultPanel({
               title="导出 Excel（含完整中文课表）"
               aria-label="导出 Excel"
               className="icon-button"
-              disabled={!result?.assignments.length}
+              disabled={!!busy || !result?.assignments.length}
               onClick={() => exportPlan("xlsx")}
             >
               <FileSpreadsheet size={17} />
@@ -140,7 +140,7 @@ export function ResultPanel({
               title="导出 PDF（中文计划）"
               aria-label="导出 PDF"
               className="icon-button"
-              disabled={!result?.assignments.length}
+              disabled={!!busy || !result?.assignments.length}
               onClick={() => exportPlan("pdf")}
             >
               <FileText size={17} />
@@ -149,7 +149,7 @@ export function ResultPanel({
               title="下载方案 JSON（任务与求解结果；完整工作区请使用备份）"
               aria-label="下载计划 JSON"
               className="icon-button plan-json-button"
-              disabled={!result?.assignments.length}
+              disabled={!!busy || !result?.assignments.length}
               onClick={() => exportPlan("json")}
             >
               <Download size={17} />

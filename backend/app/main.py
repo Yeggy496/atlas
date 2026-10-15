@@ -25,6 +25,7 @@ from .solver.compare import compare_plans
 from .llm.providers import get_provider
 from .llm.explanation_service import get_explanation_service
 from .importer import import_table, extract_text
+from .workload import admitted, SOLVER_SLOTS, MODEL_SLOTS
 from .exporters import build_xlsx, build_pdf
 from .storage import init_db, save_run, recent_runs, server_history_enabled
 
@@ -83,6 +84,11 @@ def template(scenario:Scenario):
 
 def run(request:SolveRequest,keep_previous=False):
     if not request.reviewed: raise HTTPException(409,'请先检查并确认任务和约束，再开始求解。')
+    with admitted(SOLVER_SLOTS, '求解服务'):
+        return run_admitted(request, keep_previous)
+
+
+def run_admitted(request:SolveRequest,keep_previous=False):
     result=solve(request.problem,request.mode,request.previous,keep_previous=keep_previous,overrides=request.weights)
     if result['status']=='INFEASIBLE': result['conflicts'],result['repairs']=diagnose(request.problem)
     elif result['status']=='UNKNOWN': result['conflicts'],result['repairs']=diagnose(request.problem,proved_infeasible=False,max_relaxations=6)
@@ -98,7 +104,9 @@ def optimize(request:SolveRequest):
 
 @app.post('/api/constraints/parse')
 def parse(request:ParseRequest):
-    try: return get_provider().parse_constraints(request.problem,request.text)
+    try:
+        with admitted(MODEL_SLOTS, '需求识别服务'):
+            return get_provider().parse_constraints(request.problem,request.text)
     except (ValueError,KeyError,ValidationError) as exc:
         raise HTTPException(422,str(exc)[:500]) from exc
 
@@ -125,7 +133,11 @@ def explain_assignment(request:ExplainRequest):
     ``demo``/failure keeps the response fully offline and correct.
     """
     try:
-        return get_explanation_service().build(request.problem,request.assignments,request.activity_id,request.previous,include_narrative=request.include_narrative)
+        service = get_explanation_service()
+        if not request.include_narrative:
+            return service.build(request.problem,request.assignments,request.activity_id,request.previous,include_narrative=False)
+        with admitted(MODEL_SLOTS, 'AI 说明服务'):
+            return service.build(request.problem,request.assignments,request.activity_id,request.previous)
     except KeyError as exc:
         raise HTTPException(404,str(exc)[:500]) from exc
 
@@ -150,6 +162,11 @@ def diagnose_conflicts(request:SolveRequest):
     """
     if not request.reviewed:
         raise HTTPException(409,'请先检查并确认任务和约束，再开始求解。')
+    with admitted(SOLVER_SLOTS, '求解服务'):
+        return diagnose_admitted(request)
+
+
+def diagnose_admitted(request:SolveRequest):
     probe=solve(request.problem,request.mode,seconds=float(os.getenv('ATLAS_DIAGNOSIS_SECONDS','2')),previous=request.previous,overrides=request.weights)
     status=probe['status']
     if status in ('OPTIMAL','FEASIBLE'):

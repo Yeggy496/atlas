@@ -1,4 +1,4 @@
-import { useRef, useState, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import { describeConstraint } from "./constraintDescription";
 import {
   Sparkles,
@@ -125,6 +125,25 @@ export function InputPanel({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState("all");
   const inputTooLong = input.length > MAX_INPUT_CHARS;
+  const knownActivities = useRef(new Set(problem?.activities.map((a) => a.id)));
+  useEffect(() => {
+    const ids = new Set(problem?.activities.map((a) => a.id));
+    if ([...ids].some((id) => !knownActivities.current.has(id))) { setQuery(""); setFilter("all"); }
+    knownActivities.current = ids;
+  }, [problem]);
+  useEffect(() => { if (!scheduledIds && ["scheduled", "unassigned"].includes(filter)) setFilter("all"); }, [!!scheduledIds, filter]);
+  const search = query.trim().toLocaleLowerCase();
+  const visibleConstraints = problem?.constraints.filter((c) => `${c.label} ${describeConstraint(c, problem)}`.toLocaleLowerCase().includes(search)) ?? [];
+  const visibleActivities = problem?.activities.filter((a) => {
+    const resourceNames = [...new Set([...a.resources, ...Object.keys(a.demands), ...a.room_options])]
+      .map((id) => problem.resources.find((r) => r.id === id)?.name ?? "").join(" ");
+    return `${a.name} ${resourceNames} ${CATEGORIES[a.category]?.label ?? a.category}`.toLocaleLowerCase().includes(search) &&
+      (filter !== "required" || !a.optional) && (filter !== "optional" || a.optional) &&
+      (filter !== "scheduled" || !scheduledIds || scheduledIds.has(a.id)) &&
+      (filter !== "unassigned" || !scheduledIds?.has(a.id));
+  }) ?? [];
+  const visibleCount = inputTab === "activities" ? visibleActivities.length : visibleConstraints.length;
+  const totalCount = (inputTab === "activities" ? problem?.activities.length : problem?.constraints.length) ?? 0;
   const activityGroups = new Map<string, Activity[]>();
   for (const a of problem?.activities ?? []) {
     if (a.group) {
@@ -204,6 +223,10 @@ export function InputPanel({
         <p id="input-length-hint" className={`input-length-hint ${inputTooLong ? "too-long" : ""}`}>
           {inputTooLong ? `剩余 ${input.length.toLocaleString()} 字 · 每次识别最多 4,000 字，余下文字会保留` : `${input.length.toLocaleString()} / 4,000 字`}
         </p>
+        {inputTooLong && <button className="clear-input-button" disabled={!!busy} onClick={() => {
+          const url = URL.createObjectURL(new Blob([input], { type: "text/plain;charset=utf-8" }));
+          const link = document.createElement("a"); link.href = url; link.download = `atlas-input-${scenario}.txt`; link.click(); URL.revokeObjectURL(url);
+        }}><Download size={12}/>下载原文</button>}
       </div>
       {inputPending && <div className="pending-input" role="status">
         <strong>这段需求尚未纳入计划</strong><p>先点击“{inputTooLong ? "识别下一段" : "识别约束"}”，再检查新增或修改的内容。</p>
@@ -302,11 +325,16 @@ export function InputPanel({
         </button>
       </div>
       <div className="constraint-list">
+        {(search || inputTab === "activities" && filter !== "all") && <div className="filter-summary" role="status">
+          <span>{visibleCount ? `显示 ${visibleCount} / ${totalCount} 项` : "没有匹配的内容，原有数据仍保留。"}</span>
+          <button onClick={() => { setQuery(""); setFilter("all"); }}>清除筛选</button>
+        </div>}
+        {inputTab === "constraints" && totalCount === 0 && !!problem?.activities.length && <div className="start-plan-note">尚未添加额外约束。活动自身的日期、时长和资源限制仍会生效；需要时可点击“添加约束”。</div>}
         {problem && !problem.activities.length && <div className="start-plan-note">
           还没有活动。点击上方“添加活动”，或描述本周需求后点击“识别约束”。
         </div>}
         {inputTab === "constraints"
-          ? problem?.constraints.filter((c) => `${c.label} ${describeConstraint(c, problem)}`.toLowerCase().includes(query.toLowerCase())).map((c) => (
+          ? problem && visibleConstraints.map((c) => (
               <article className="constraint-card" key={c.id}>
                 <span
                   className={`constraint-symbol ${c.level === "soft" ? "soft" : ""}`}
@@ -348,10 +376,7 @@ export function InputPanel({
                 </div>
               </article>
             ))
-          : problem?.activities.map((a) => {
-              if (!`${a.name} ${a.resources.map((id) => problem.resources.find((r) => r.id === id)?.name ?? "").join(" ")}`.toLowerCase().includes(query.toLowerCase()) ||
-                filter === "required" && a.optional || filter === "optional" && !a.optional ||
-                filter === "scheduled" && scheduledIds && !scheduledIds.has(a.id) || filter === "unassigned" && scheduledIds?.has(a.id)) return null;
+          : visibleActivities.map((a) => {
               if (a.group) {
                 if (renderedGroups.has(a.group)) return null;
                 renderedGroups.add(a.group);

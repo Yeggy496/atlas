@@ -96,7 +96,7 @@ export function readLocalWorkspaces(): { store: WorkspaceStore; warning: string 
     if (!raw) return { store: empty, warning: "" };
     const data: unknown = JSON.parse(raw);
     if (!record(data) || data.schema_version !== 1 || !scenario(data.active_scenario) || !record(data.workspaces)) {
-      return { store: empty, warning: "本地保存的数据无法恢复，已打开预置方案。" };
+      return { store: empty, warning: "本地保存的数据无法恢复。可导入备份，或从空白计划重新开始。" };
     }
     const store: WorkspaceStore = { ...empty, active_scenario: data.active_scenario };
     let damaged = false;
@@ -108,7 +108,7 @@ export function readLocalWorkspaces(): { store: WorkspaceStore; warning: string 
     }
     return { store, warning: damaged ? "部分本地数据无法恢复，已忽略损坏的内容。" : "" };
   } catch {
-    return { store: empty, warning: "无法读取本地保存，已打开预置方案。" };
+    return { store: empty, warning: "无法读取本地保存。可导入备份，或从空白计划重新开始。" };
   }
 }
 

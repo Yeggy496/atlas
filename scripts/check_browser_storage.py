@@ -39,7 +39,7 @@ def stored(page):
     return page.evaluate('(key) => JSON.parse(localStorage.getItem(key))', key)
 
 def wait_saved(page, expression):
-    page.wait_for_function(f'() => {{ const data = JSON.parse(localStorage.getItem("{key}")); return data && ({expression}); }}')
+    page.wait_for_function(f'() => {{ try {{ const data = JSON.parse(localStorage.getItem("{key}")); return data && ({expression}); }} catch {{ return false; }} }}')
 
 def fresh(context, expect_saved=True):
     page, requests = watch(context)

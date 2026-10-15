@@ -43,7 +43,7 @@ import {
   Download,
   CheckCircle2,
 } from "lucide-react";
-import { api, exportPlan as exportPlanRequest, readResponse } from "./api";
+import { api, exportPlan as exportPlanRequest, upload } from "./api";
 import { Calendar } from "./Calendar";
 import { ActivityEditor, ConstraintEditor, Dialog } from "./Editors";
 import { readLocalWorkspaces, writeLocalWorkspaces, readWorkspaceBackup, workspaceKey, LOCAL_WORKSPACE_KEY, type LocalWorkspace } from "./localWorkspace";
@@ -103,6 +103,8 @@ export default function App() {
   const [historyWarning, setHistoryWarning] = useState("");
   const [locallySaved, setLocallySaved] = useState(!!initial);
   const knownCopies = useRef(Object.fromEntries(Object.entries(local.store.workspaces).map(([s, saved]) => [s, workspaceKey(saved)])));
+  const unsavedWorkspaces = useRef<Partial<Record<Scenario, LocalWorkspace>>>({});
+  const [unsavedScenes, setUnsavedScenes] = useState<Scenario[]>([]);
   const [storageConflict, setStorageConflict] = useState<{ latest: LocalWorkspace | null } | null>(null);
   const [onboarding, setOnboarding] = useState(!initial);
   const [repeatActivity, setRepeatActivity] = useState<Activity | null>(null);
@@ -110,6 +112,8 @@ export default function App() {
   const modelEpoch = useRef(0);
   const validationCounter = useRef(0);
   const [connectionFailed, setConnectionFailed] = useState(false);
+  const [retryAction, setRetryAction] = useState<"parse" | "solve" | null>(null);
+  const [pendingText, setPendingText] = useState<{ kind: string; text: string; chars: number; filename: string } | null>(null);
   const [weightsFailed, setWeightsFailed] = useState(false);
   const explanationCache = useRef(new Map<string, Explanation>());
   const selectedKey = useRef("");
@@ -174,9 +178,13 @@ export default function App() {
   canSave.current = localReady;
   selectedKey.current = result && selected ? `${result.run_id}:${selected.activity_id}` : "";
 
-  function saveLocal() {
+  function updateUnsavedScenes() {
+    const scenes = Object.keys(unsavedWorkspaces.current) as Scenario[];
+    setUnsavedScenes((current) => current.join() === scenes.join() ? current : scenes);
+  }
+  function saveLocal(): boolean {
     const current = snapshot.current;
-    if (!canSave.current || !current) return;
+    if (!canSave.current || !current) return true;
     const s = current.problem.scenario;
     // Another tab may have edited a different scenario since this tab opened.
     // Only replace this workspace; keep the latest stored copies of the others.
@@ -188,22 +196,26 @@ export default function App() {
       setStorageConflict({ latest: latest[s] ?? null });
       setLocallySaved(false);
       setSaveWarning("另一个标签页更新了此计划，当前编辑尚未覆盖它。请选择保留哪一份，或先备份当前内容。");
-      return;
+      return false;
     }
     if (savedKey === workspaceKey(current)) {
       knownCopies.current[s] = savedKey;
       localStore.current = { ...latestStore, active_scenario: s };
       const warning = latestStore.active_scenario !== s ? writeLocalWorkspaces(localStore.current) : "";
-      setSaveWarning(warning); setLocallySaved(!warning); return;
+      delete unsavedWorkspaces.current[s]; updateUnsavedScenes();
+      setSaveWarning(warning); setLocallySaved(!warning); return !warning;
     }
     localStore.current = {
-      ...localStore.current, active_scenario: s,
-      workspaces: { ...localStore.current.workspaces, ...latest, [s]: current },
+      ...latestStore, active_scenario: s,
+      workspaces: { ...latest, [s]: current },
     };
     const warning = writeLocalWorkspaces(localStore.current);
-    if (!warning) knownCopies.current[s] = workspaceKey(current);
+    if (!warning) { knownCopies.current[s] = workspaceKey(current); delete unsavedWorkspaces.current[s]; }
+    else unsavedWorkspaces.current[s] = current;
+    updateUnsavedScenes();
     setSaveWarning(warning);
     setLocallySaved(!warning);
+    return !warning;
   }
   function restoreLocal(saved: LocalWorkspace) {
     modelEpoch.current += 1;
@@ -231,7 +243,7 @@ export default function App() {
     knownCopies.current[s] = workspaceKey(latest);
     setStorageConflict(null); setSaveWarning("");
     if (useLatest && latest) { restoreLocal(latest); setNotice("已打开另一个标签页保存的最新内容。"); }
-    else { saveLocal(); setNotice("已用当前内容保存。另一个标签页会收到更新提示。"); }
+    else { const saved = saveLocal(); setNotice(saved ? "已用当前内容保存。另一个标签页会收到更新提示。" : "当前编辑仍保留在页面中，尚未写入浏览器，请先下载备份。"); }
   }
   function rememberRun(p: Problem, r: Result, selectedMode: Mode = mode, weights = customWeights) {
     const saved = snapshot.current;
@@ -252,7 +264,11 @@ export default function App() {
     saveLocal();
     if (undo.removeScenario) {
       const store = readLocalWorkspaces().store;
+      if (workspaceKey(store.workspaces[undo.removeScenario]) !== (knownCopies.current[undo.removeScenario] ?? "")) {
+        setError("另一标签页已更新这个场景，请先处理更新提示；本次撤销没有删除任何内容。"); return;
+      }
       delete store.workspaces[undo.removeScenario];
+      delete unsavedWorkspaces.current[undo.removeScenario]; updateUnsavedScenes();
       store.active_scenario = undo.restore.problem.scenario;
       localStore.current = store;
       setSaveWarning(writeLocalWorkspaces(store));
@@ -262,7 +278,7 @@ export default function App() {
   }
   // Save edits, including unparsed text and unconfirmed drafts. Do not save a
   // half-switched template or overwrite another scenario's workspace.
-  useEffect(saveLocal, [localReady, scenario, problem, result, input, mode,
+  useEffect(() => { saveLocal(); }, [localReady, scenario, problem, result, input, mode,
     customWeights, reviewed, summary, warnings, inputTab, view, appliedInput]);
   useEffect(() => {
     const flush = () => saveLocal();
@@ -273,6 +289,14 @@ export default function App() {
       window.removeEventListener("pagehide", flush);
       document.removeEventListener("visibilitychange", hidden);
     };
+  }, []);
+  useEffect(() => {
+    const protectUnsaved = (event: BeforeUnloadEvent) => {
+      if (!Object.keys(unsavedWorkspaces.current).length) return;
+      event.preventDefault(); event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", protectUnsaved);
+    return () => window.removeEventListener("beforeunload", protectUnsaved);
   }, []);
   useEffect(() => {
     const changed = (event: StorageEvent) => {
@@ -301,11 +325,12 @@ export default function App() {
     setError("");
     const latest = readLocalWorkspaces().store;
     localStore.current = latest;
-    const saved = !reset && latest.workspaces[s];
-    knownCopies.current[s] = workspaceKey(latest.workspaces[s]);
+    const memory = !reset && unsavedWorkspaces.current[s];
+    const saved = !reset && (memory || latest.workspaces[s]);
+    if (!memory) knownCopies.current[s] = workspaceKey(latest.workspaces[s]);
     if (saved) {
       restoreLocal(saved);
-      setNotice("已恢复此浏览器上次保存的内容。");
+      setNotice(memory ? "已恢复本次打开期间的未保存草稿，请先备份，关闭页面后内存草稿会丢失。" : "已恢复此浏览器上次保存的内容。");
       return;
     }
     setLocalReady(false);
@@ -411,6 +436,7 @@ export default function App() {
     setResult(null);
     setReviewed(false);
     setError("");
+    setRetryAction(null);
     setSelected(null);
     setBaseline(null);
   }
@@ -464,6 +490,7 @@ export default function App() {
     const effectiveWeights =
       weightsOverride === undefined ? customWeights : weightsOverride;
     setBusy("正在组合优化");
+    setRetryAction(null);
     setError("");
     setSelected(null);
     try {
@@ -490,6 +517,7 @@ export default function App() {
       else setNotice(`已生成合法计划 · ${r.assignments.length} 项活动`);
     } catch (e) {
       setError((e as Error).message);
+      setRetryAction("solve");
     } finally {
       setBusy("");
     }
@@ -499,12 +527,14 @@ export default function App() {
     const epoch = modelEpoch.current;
     let splitAt = Math.min(input.length, MAX_INPUT_CHARS);
     if (input.length > MAX_INPUT_CHARS) {
-      const newline = input.lastIndexOf("\n", splitAt);
+      const newline = input.lastIndexOf("\n", splitAt - 1);
       if (newline > MAX_INPUT_CHARS / 2) splitAt = newline + 1;
     }
+    if (splitAt < input.length && /[\uD800-\uDBFF]/.test(input[splitAt - 1])) splitAt -= 1;
     const segment = input.slice(0, splitAt);
     const remainder = input.slice(splitAt);
     setBusy("正在识别约束");
+    setRetryAction(null);
     setError("");
     try {
       const data = await api<{
@@ -525,6 +555,7 @@ export default function App() {
       setNotice("请检查识别结果，确认后再生成计划。");
     } catch (e) {
       setError((e as Error).message);
+      setRetryAction("parse");
     } finally {
       setBusy("");
     }
@@ -538,11 +569,7 @@ export default function App() {
       const form = new FormData();
       form.append("file", file);
       form.append("problem_json", JSON.stringify(problem));
-      const response = await fetch("/api/import", {
-        method: "POST",
-        body: form,
-      });
-      const data = await readResponse<{ problem: Problem; summary: string[]; duplicate_candidates?: number; warnings?: string[] }>(response);
+      const data = await upload<{ problem: Problem; summary: string[]; duplicate_candidates?: number; warnings?: string[] }>("/import", form);
       if (epoch !== modelEpoch.current) return;
       draft(data.problem);
       setSummary([modelChanges(problem, data.problem), "文件中的活动已追加到当前计划，原有活动已保留。", ...data.summary]);
@@ -563,25 +590,21 @@ export default function App() {
     try {
       const form = new FormData();
       form.append("file", file);
-      const response = await fetch("/api/import/text", {
-        method: "POST",
-        body: form,
-      });
-      const data = await readResponse<{ kind: string; text: string; chars: number }>(
-        response,
-      );
-      // 提取出的文本进入已有解析管线，不直接改写问题（规格 §11：确定性提取优先）。
-      setInput(data.text);
-      setInputTab("constraints");
-      setNotice(
-        `已从 ${data.kind.toUpperCase()} 提取 ${data.chars} 个字符，请点击“识别约束”再确认。`,
-      );
+      const data = await upload<{ kind: string; text: string; chars: number }>("/import/text", form);
+      setPendingText({ ...data, filename: file.name });
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy("");
       if (textFileRef.current) textFileRef.current.value = "";
     }
+  }
+  function applyTextImport(append: boolean) {
+    if (!pendingText) return;
+    if (snapshot.current) setUndo({ restore: snapshot.current });
+    setInput(append && input.trim() ? `${input.trimEnd()}\n\n${pendingText.text}` : pendingText.text);
+    setAppliedInput(""); setInputTab("constraints"); setPendingText(null); setRetryAction(null);
+    setNotice("文字已放入输入框，尚未修改任务。点击识别约束后再确认；此操作可撤销。");
   }
   async function repair(constraint_id: string) {
     if (!problem) return;
@@ -622,8 +645,10 @@ export default function App() {
   }
   function backupWorkspace() {
     if (!snapshot.current) return;
-    const url = URL.createObjectURL(new Blob([JSON.stringify({ format: "atlas-workspace", version: 1,
-      saved_at: new Date().toISOString(), workspace: snapshot.current }, null, 2)], { type: "application/json" }));
+    const blob = new Blob([JSON.stringify({ format: "atlas-workspace", version: 1,
+      saved_at: new Date().toISOString(), workspace: snapshot.current }, null, 2)], { type: "application/json" });
+    if (blob.size > 2_000_000) { setError("当前备份超过 2 MB。请先在输入框下方下载原文，再精简输入进行备份。原有内容仍保留。"); return; }
+    const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url;
     a.download = `atlas-workspace-${scenario}-${problem?.week_start}.json`; a.click();
     URL.revokeObjectURL(url);
@@ -717,7 +742,7 @@ export default function App() {
     });
   }
   function exportPlan(format: "json" | "xlsx" | "pdf" = "json") {
-    if (!problem || !result) return;
+    if (!problem || !result || busy) return;
     if (format === "json") {
       const contents = JSON.stringify({ problem, result }, null, 2);
       const url = URL.createObjectURL(
@@ -947,6 +972,7 @@ export default function App() {
               <AlertTriangle size={17} />
               <span>{error}</span>
               {connectionFailed && <button onClick={() => void reconnect()}>重试连接</button>}
+              {retryAction && <button disabled={!!busy || retryAction === "solve" && (!reviewed || inputPending)} onClick={() => void (retryAction === "parse" ? parse() : optimize())}>{retryAction === "parse" ? "重试识别" : "重试生成"}</button>}
               {!problem && <button disabled={!!busy} onClick={() => void load(scenario)}>重新载入工作空间</button>}
               <button onClick={() => setError("")} aria-label="关闭错误">
                 <X size={15} />
@@ -957,11 +983,15 @@ export default function App() {
             <div className="message error storage-warning" role="alert">
               <AlertTriangle size={17} />
               <span>{saveWarning}</span>
+              {!storageConflict && <button onClick={backupWorkspace}>备份当前内容</button>}
               {storageConflict && <div className="storage-conflict-actions"><button disabled={!!busy || !storageConflict.latest} onClick={() => resolveStorageConflict(true)}>打开最新内容</button><button disabled={!!busy} onClick={() => resolveStorageConflict(false)}>保留当前编辑</button><button onClick={backupWorkspace}>先备份当前内容</button></div>}
             </div>
           )}
+          {unsavedScenes.some((s) => s !== scenario) && <div className="message error storage-warning" role="alert"><AlertTriangle size={17}/><span>另有场景尚未写入浏览器，草稿暂留在本次页面内存中。关闭前请打开并备份：</span>
+            {unsavedScenes.filter((s) => s !== scenario).map((s) => <button key={s} disabled={!!busy} onClick={() => void load(s)}>{SCENARIOS[s].title}</button>)}
+          </div>}
           {historyWarning && <div className="message error history-save-warning" role="alert"><AlertTriangle size={17}/><span>{historyWarning}</span></div>}
-          {notice && !constraintEditor && !addingActivity && !editingActivity && !resourcesOpen && !help && !confirmation && !selected && !repeatActivity && !onboarding && (
+          {notice && !constraintEditor && !addingActivity && !editingActivity && !resourcesOpen && !help && !confirmation && !selected && !repeatActivity && !onboarding && !pendingText && (
             <div className="toast" role="status">
               <CheckCircle2 size={17} />
               {notice}
@@ -1083,6 +1113,7 @@ export default function App() {
               </section>
               <div className="workspace-grid">
                 <InputPanel
+                  key={scenario}
                   problem={problem}
                   busy={busy}
                   provider={provider}
@@ -1159,6 +1190,15 @@ export default function App() {
           )}
         </main>
       </div>
+      {pendingText && <Dialog title="导入文字到输入框" onClose={() => setPendingText(null)}>
+        <div className="text-import-preview"><p><strong>{pendingText.filename}</strong> · 已提取 {pendingText.chars.toLocaleString()} 字</p>
+          <pre>{pendingText.text.slice(0, 700)}{pendingText.text.length > 700 ? "\n…（其余文字会完整导入）" : ""}</pre>
+          <p className="form-note">当前输入尚未改变。选择放入方式后仍需点击“识别约束”，不会自动调用模型或覆盖现有任务。</p>
+          <div className="replacement-actions"><button className="secondary" onClick={() => setPendingText(null)}>取消</button>
+            {input.trim() && <button className="secondary" onClick={() => applyTextImport(false)}>替换输入</button>}
+            <button className="primary" onClick={() => applyTextImport(!!input.trim())}>{input.trim() ? "追加到输入" : "放入输入框"}</button></div>
+        </div>
+      </Dialog>}
       {onboarding && problem && <Dialog title="开始安排你的时间" onClose={() => setOnboarding(false)}>
         <div className="welcome-content"><span className="welcome-mark">Σ</span><h3>把需求变成可执行的计划</h3>
           <p>添加自己的任务，或用示例看看效果。内容会保存在此浏览器，下次回来可以继续。</p>
@@ -1246,15 +1286,18 @@ export default function App() {
                       ),
                   )
                 : problem.constraints;
+              const validTargets = new Set(["*", ...activities.map((x) => x.id), ...activities.map((x) => x.category), ...problem.resources.map((r) => r.id)]);
               const p = {
                 ...problem,
                 activities,
-                constraints: c ? [...constraints, c] : constraints,
+                constraints: (c ? [...constraints, c] : constraints).filter((rule) => validTargets.has(rule.target)),
               };
               if (!await validateDraft(p)) return;
               setAddingActivity(false);
               setEditingActivity(null);
               setInputTab("activities");
+              const removed = constraints.length + (c ? 1 : 0) - p.constraints.length;
+              if (removed) setNotice(`活动已保存，${removed} 条已没有适用活动的分类约束已移除，可撤销恢复。`);
             } catch (e) {
               setError((e as Error).message);
             }

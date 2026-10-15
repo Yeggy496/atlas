@@ -451,7 +451,7 @@ export function ActivityEditor({
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState("");
   const savingRef = useRef(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(!initial && problem.scenario !== "life");
   const [name, setName] = useState(initial?.name ?? "");
   const [duration, setDuration] = useState(initial?.duration ?? 2);
   const [category, setCategory] = useState(initial?.category ?? {
@@ -463,12 +463,13 @@ export function ActivityEditor({
   );
   const [fixed, setFixed] = useState(Boolean(fixedConstraint));
   const [optional, setOptional] = useState(initial?.optional ?? false);
+  const [priority, setPriority] = useState(initial?.priority ?? 5);
   const [resources, setResources] = useState<string[]>(initial?.resources ?? (problem.scenario === "production" ? [] : (
     problem.resources.find((resource) => resource.type !== "room")
       ? [problem.resources.find((resource) => resource.type !== "room")!.id] : []
   )));
   const [demands, setDemands] = useState<Record<string, number>>({ ...initial?.demands });
-  const [rooms, setRooms] = useState<string[]>([...(initial?.room_options ?? [])]);
+  const [rooms, setRooms] = useState<string[]>([...(initial?.room_options ?? (problem.scenario !== "life" && problem.scenario !== "production" ? problem.resources.filter((r) => r.type === "room").map((r) => r.id) : []))]);
   const [requiredSeats, setRequiredSeats] = useState(initial?.required_seats ?? 0);
   const [roomType, setRoomType] = useState(initial?.room_type ?? "");
   const [customRoomType, setCustomRoomType] = useState(false);
@@ -504,7 +505,7 @@ export function ActivityEditor({
     new Set([...Object.keys(CATEGORIES), category]),
   );
   const durationOptions = Array.from({ length: 48 }, (_, index) => index + 1);
-  const fields = JSON.stringify({ name, duration, category, day, start, fixed, optional, resources,
+  const fields = JSON.stringify({ name, duration, category, day, start, fixed, optional, priority, resources,
     demands, rooms, requiredSeats, roomType, windowStart, windowEnd, allowedDays });
   const original = useRef(fields);
   const dirty = original.current !== fields;
@@ -558,7 +559,7 @@ export function ActivityEditor({
             days: day === -1 ? allowedDays : [day],
             window_start: windowStart,
             window_end: windowEnd,
-            optional,
+            optional, priority,
           };
           savingRef.current = true;
           setSaving(true);
@@ -675,6 +676,11 @@ export function ActivityEditor({
           />
           可选活动，允许时间不足时不安排
         </label>
+        {optional && <label>可选活动优先级
+          <select aria-label="可选活动优先级" value={priority} onChange={(e) => setPriority(Number(e.target.value))}>
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((value) => <option key={value} value={value}>{value}{value === 1 ? " · 最低" : value === 5 ? " · 普通" : value === 10 ? " · 最高" : ""}</option>)}
+          </select><small className="form-field-hint">时间冲突时，优先安排数值较高的可选活动；必做活动仍必须安排。</small>
+        </label>}
         <details className="editor-resource-settings" open={settingsOpen}
           onToggle={(event) => setSettingsOpen(event.currentTarget.open)}>
           <summary>资源与时间设置
@@ -683,6 +689,7 @@ export function ActivityEditor({
           <div className="editor-resource-body">
             <fieldset className="editor-resource-group" disabled={saving}>
               <legend>同时占用的人员与设备</legend>
+              {!selectedResources.length && !rooms.length && <p className="resource-empty-warning">尚未选择占用资源，此活动可以与其他活动同时安排。需要避免冲突时，请选择人员、设备或场地。</p>}
               <p>班级、教师和设备可同时选择；数量表示该活动同时需要几份。</p>
               {directResources.length === 0 && <p>暂无人员或设备，可在管理资源中新增。</p>}
               {directResources.map((resource) => {

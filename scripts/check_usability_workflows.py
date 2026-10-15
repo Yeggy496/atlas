@@ -401,6 +401,7 @@ def main():
             assert len(text) > 4000
             page.locator('input[type="file"][accept=".txt,.pdf"]').set_input_files({
                 'name': 'long-requirements.txt', 'mimeType': 'text/plain', 'buffer': text.encode('utf-8')})
+            page.get_by_role('dialog', name='导入文字到输入框').get_by_role('button', name='放入输入框', exact=True).click()
             expect(page.get_by_label('自然语言需求', exact=True)).to_have_value(text)
             captured = []
             context.unroute('**/api/constraints/parse')

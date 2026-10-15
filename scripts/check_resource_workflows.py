@@ -127,7 +127,8 @@ try:
         dialog.get_by_label('活动名称', exact=True).fill('多资源排课测试')
         expect(dialog.get_by_label('类别', exact=True)).to_have_value('course')
         dialog.get_by_label('时长', exact=True).select_option('4')
-        dialog.locator('.editor-resource-settings > summary').click()
+        if dialog.locator('.editor-resource-settings').get_attribute('open') is None:
+            dialog.locator('.editor-resource-settings > summary').click()
         expect(dialog.get_by_role('checkbox', name='占用计算机 2401 班', exact=True)).to_be_checked()
         dialog.get_by_role('checkbox', name='占用张老师', exact=True).check()
         dialog.get_by_role('checkbox', name='候选场地教学楼 A201', exact=True).check()
@@ -227,9 +228,12 @@ try:
         dialog.get_by_label('活动名称', exact=True).fill('双设备并行实验测试')
         expect(dialog.get_by_label('类别', exact=True)).to_have_value('experiment')
         dialog.get_by_label('时长', exact=True).select_option('4')
-        dialog.locator('.editor-resource-settings > summary').click()
+        if dialog.locator('.editor-resource-settings').get_attribute('open') is None:
+            dialog.locator('.editor-resource-settings > summary').click()
         dialog.get_by_role('checkbox', name='占用离心机 · 2 台', exact=True).check()
         dialog.get_by_label('离心机 · 2 台需求数量', exact=True).fill('2')
+        for choice in dialog.locator('.editor-room-choice input').all():
+            choice.uncheck()
         dialog.get_by_role('checkbox', name='候选场地基础实验室', exact=True).check()
         dialog.get_by_label('最低座位数', exact=True).fill('4')
         dialog.get_by_label('场地类型要求', exact=True).select_option('general')
@@ -254,7 +258,8 @@ try:
         page.get_by_role('button', name='添加活动', exact=True).click()
         dialog = page.get_by_role('dialog', name='添加活动', exact=True)
         dialog.get_by_label('活动名称', exact=True).fill('边界输入测试')
-        dialog.locator('.editor-resource-settings > summary').click()
+        if dialog.locator('.editor-resource-settings').get_attribute('open') is None:
+            dialog.locator('.editor-resource-settings > summary').click()
         dialog.get_by_label('最早开始', exact=True).select_option('42')
         dialog.get_by_label('最晚结束', exact=True).select_option('42')
         count = len(validation_requests)
@@ -263,10 +268,14 @@ try:
         assert len(validation_requests) == count
         dialog.get_by_label('最早开始', exact=True).select_option('16')
         dialog.get_by_label('最晚结束', exact=True).select_option('44')
+        for choice in dialog.locator('.editor-room-choice input').all():
+            choice.uncheck()
         dialog.get_by_label('最低座位数', exact=True).fill('12')
         dialog.get_by_role('button', name='添加并检查约束', exact=True).click()
         expect(dialog.get_by_role('alert')).to_contain_text('至少选择一个候选场地')
         assert len(validation_requests) == count
+        for choice in dialog.locator('.editor-room-choice input').all():
+            choice.uncheck()
         dialog.get_by_role('checkbox', name='候选场地基础实验室', exact=True).check()
         dialog.get_by_role('checkbox', name='占用离心机 · 2 台', exact=True).check()
         dialog.get_by_label('离心机 · 2 台需求数量', exact=True).fill('0')
@@ -290,7 +299,8 @@ try:
         dialog = page.get_by_role('dialog', name='添加活动', exact=True)
         dialog.get_by_label('活动名称', exact=True).fill('双机台择一加工测试')
         dialog.get_by_label('时长', exact=True).select_option('5')
-        dialog.locator('.editor-resource-settings > summary').click()
+        if dialog.locator('.editor-resource-settings').get_attribute('open') is None:
+            dialog.locator('.editor-resource-settings > summary').click()
         dialog.get_by_role('checkbox', name='候选资源数控机床 1 号', exact=True).check()
         dialog.get_by_role('checkbox', name='候选资源数控机床 2 号', exact=True).check()
         validate_submit(page, dialog, '添加并检查约束')

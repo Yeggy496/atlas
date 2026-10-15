@@ -6,7 +6,7 @@ A small scheduling application for personal weekly planning, one-class academic 
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Current version: v0.2.0 improves the complete daily workflow: start with your own tasks, review AI changes, schedule, inspect and adjust. [Release notes](docs/RELEASE_0.2.0.md).
+Current version: v0.2.1 improves gray-test readiness: safe text imports, visible filters, optional priorities, meeting-room allocation, failed-save recovery, and bounded expensive requests. [Release notes](docs/RELEASE_0.2.1.md).
 Product workflow notes: [v0.1.9](docs/RELEASE_0.1.9.md).
 Local workspace notes: [v0.1.7](docs/RELEASE_0.1.7.md).
 Product interface notes: [v0.1.6](docs/RELEASE_0.1.6.md).
@@ -113,5 +113,9 @@ Model gateways must be reachable from the hosting server; test them before use.
 ## Tests
 
 `python -m pytest backend/tests -q`
+
+Start the application, then run `python scripts/check_gray_workflows.py --url http://127.0.0.1:8000` for focused real-browser checks. The other `scripts/check_*workflows.py` checks cover complete resource, backup, repair, and persistence journeys. These tests use isolated browser data. Network and quota failures are simulated deliberately; valid schedules are produced by CP-SAT.
+
+The single-process server bounds concurrent solves/diagnosis to 2 and model requests to 2 by default (`ATLAS_CONCURRENT_SOLVES` / `ATLAS_CONCURRENT_MODEL_CALLS`, supported range 1–8). Requests above capacity receive HTTP 429 with `Retry-After: 3`; the UI preserves current content and offers retry. This protects a small instance; it is not a throughput benchmark or a distributed queue.
 
 See `THIRD_PARTY.md` for dependencies and upstream references. Credentials, local databases, private requirements documents, and runtime logs are excluded from this repository.
