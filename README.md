@@ -6,9 +6,10 @@ A small scheduling application for personal weekly planning, one-class academic 
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Current version: **v0.2.2 — OptiDay**. A quieter white, graphite and forest palette, an original clock symbol,
-readable category colors, compatible browser-data upgrades, and automatic synchronization of both frontend bundles.
-The validated v0.2.1 scheduling workflows are retained. [Release notes and verification](docs/RELEASE_0.2.2.md).
+Current version: **v0.2.3 — OptiDay**. Long structured-output budgets, one bounded validation repair,
+and a reversible scene suggestion for personal plans entered in a different workspace.
+[Current fix and verification scope](docs/RELEASE_0.2.3.md).
+The v0.2.2 identity, palette and compatible browser-data upgrades are retained. [Interface release](docs/RELEASE_0.2.2.md).
 Product workflow notes: [v0.1.9](docs/RELEASE_0.1.9.md).
 Local workspace notes: [v0.1.7](docs/RELEASE_0.1.7.md).
 Product interface notes: [v0.1.6](docs/RELEASE_0.1.6.md).
@@ -86,6 +87,7 @@ The real providers call an OpenAI-compatible `/chat/completions` endpoint and re
 | `OPENAI_MODEL` / `DEEPSEEK_MODEL` | model name (defaults `gpt-4.1-mini` / `deepseek-flash`) |
 | `OPENAI_BASE_URL` / `DEEPSEEK_BASE_URL` | optional OpenAI-compatible gateway override (blank = official endpoint) |
 | `OPENAI_TIMEOUT` / `DEEPSEEK_TIMEOUT` | per-request seconds (defaults `35` / `90`) |
+| `OPENAI_MAX_TOKENS` / `DEEPSEEK_MAX_TOKENS` | structured task output budgets (defaults `16384` / `24576`; supported range `1024–32768`) |
 
 `backend/tests/test_llm_live.py` performs a real end-to-end provider call. It is skipped unless
 `OPTIDAY_LLM_LIVE_TEST=1` and a key are set, so the offline suite and CI stay green without credentials.

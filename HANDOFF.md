@@ -1,4 +1,4 @@
-> 2026-10-27 更新：当前产品为 OptiDay v0.2.2。以 VERSION、README 和 [本轮发布与验证记录](docs/RELEASE_0.2.2.md) 为准；下文保留历史接力记录，不代表当前版本保证。
+> 2026-10-27 更新：当前为 OptiDay v0.2.3。长文本识别修复见 [最新发布记录](docs/RELEASE_0.2.3.md)，以 VERSION 和 README 为准；下文保留历史记录。
 
 # Handoff
 

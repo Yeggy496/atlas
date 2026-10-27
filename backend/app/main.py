@@ -24,6 +24,7 @@ from .solver.engine import solve, WEIGHTS, REPAIR_STABILITY
 from .solver.diagnosis import diagnose, add_demo_conflict
 from .solver.compare import compare_plans
 from .llm.providers import get_provider
+from .llm.parse_support import suggested_scenario
 from .llm.explanation_service import get_explanation_service
 from .importer import import_table, extract_text
 from .workload import admitted, SOLVER_SLOTS, MODEL_SLOTS
@@ -108,6 +109,10 @@ def optimize(request:SolveRequest):
 
 @app.post('/api/constraints/parse')
 def parse(request:ParseRequest):
+    suggestion = suggested_scenario(request.problem, request.text)
+    if suggestion and not request.allow_scenario_mismatch:
+        raise HTTPException(409, {'code': 'scenario_mismatch', 'suggested_scenario': suggestion,
+                                 'message': '这段需求更适合个人周计划。可切换场景并保留输入，或明确继续使用当前场景。'})
     try:
         with admitted(MODEL_SLOTS, '需求识别服务'):
             return get_provider().parse_constraints(request.problem,request.text)

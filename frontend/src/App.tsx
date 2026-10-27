@@ -44,7 +44,7 @@ import {
   Download,
   CheckCircle2,
 } from "lucide-react";
-import { api, exportPlan as exportPlanRequest, upload } from "./api";
+import { api, ApiError, exportPlan as exportPlanRequest, upload } from "./api";
 import { Calendar } from "./Calendar";
 import { ActivityEditor, ConstraintEditor, Dialog } from "./Editors";
 import { readLocalWorkspaces, writeLocalWorkspaces, readWorkspaceBackup, workspaceKey, LOCAL_WORKSPACE_KEY, type LocalWorkspace } from "./localWorkspace";
@@ -115,6 +115,7 @@ export default function App() {
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [retryAction, setRetryAction] = useState<"parse" | "solve" | null>(null);
   const [pendingText, setPendingText] = useState<{ kind: string; text: string; chars: number; filename: string } | null>(null);
+  const [scenarioHint, setScenarioHint] = useState<{ target: Scenario; input: string } | null>(null);
   const [weightsFailed, setWeightsFailed] = useState(false);
   const explanationCache = useRef(new Map<string, Explanation>());
   const selectedKey = useRef("");
@@ -314,7 +315,7 @@ export default function App() {
     return () => window.removeEventListener("storage", changed);
   }, []);
 
-  async function load(s: Scenario, reset = false) {
+  async function load(s: Scenario, reset = false, carriedInput?: string) {
     if (storageConflict) { setError("请先处理多标签页更新提示，再切换场景；可先下载当前备份。"); return; }
     saveLocal();
     modelEpoch.current += 1;
@@ -332,6 +333,11 @@ export default function App() {
     if (!memory) knownCopies.current[s] = workspaceKey(latest.workspaces[s]);
     if (saved) {
       restoreLocal(saved);
+      if (carriedInput !== undefined) {
+        setUndo({ restore: saved }); setInput(carriedInput); setAppliedInput(""); setReviewed(false); setInputTab("constraints");
+        setNotice("已切换并带入需求，已有任务仍保留。请点击“识别约束”，原输入可撤销恢复。");
+        return;
+      }
       setNotice(memory ? "已恢复本次打开期间的未保存草稿，请先备份，关闭页面后内存草稿会丢失。" : "已恢复此浏览器上次保存的内容。");
       return;
     }
@@ -344,9 +350,9 @@ export default function App() {
       p.week_start = mondayOf(new Date().toLocaleDateString("sv-SE"));
       if (!reset) {
         restoreLocal({ problem: { ...p, name: `我的${SCENARIOS[s].title}`, activities: [], constraints: [] },
-          result: null, previous: [], input: "", appliedInput: "", mode: "balanced", customWeights: null,
+          result: null, previous: [], input: carriedInput ?? "", appliedInput: "", mode: "balanced", customWeights: null,
           reviewed: false, summary: [], warnings: [], inputTab: "activities", view: "calendar" });
-        setNotice("从自己的任务开始，或点击“恢复预置方案”体验完整示例。");
+        setNotice(carriedInput !== undefined ? "已切换并带入需求。请点击“识别约束”，再检查生成的任务。" : "从自己的任务开始，或点击“恢复预置方案”体验完整示例。");
         return;
       }
       restoreLocal({
@@ -524,7 +530,7 @@ export default function App() {
       setBusy("");
     }
   }
-  async function parse() {
+  async function parse(allowScenarioMismatch = false) {
     if (!problem || busy) return;
     const epoch = modelEpoch.current;
     let splitAt = Math.min(input.length, MAX_INPUT_CHARS);
@@ -544,7 +550,7 @@ export default function App() {
         summary: string[];
         warnings: string[];
         provider: string;
-      }>("/constraints/parse", { problem, text: segment });
+      }>("/constraints/parse", { problem, text: segment, ...(allowScenarioMismatch ? { allow_scenario_mismatch: true } : {}) });
       if (epoch !== modelEpoch.current) return;
       const changes = modelChanges(problem, data.problem);
       draft(data.problem);
@@ -556,6 +562,11 @@ export default function App() {
       setInputTab("constraints");
       setNotice("请检查识别结果，确认后再生成计划。");
     } catch (e) {
+      if (epoch !== modelEpoch.current) return;
+      if (e instanceof ApiError && e.code === "scenario_mismatch" && e.suggestedScenario && Object.hasOwn(SCENARIOS, e.suggestedScenario)) {
+        setScenarioHint({ target: e.suggestedScenario as Scenario, input });
+        setRetryAction(null); return;
+      }
       setError((e as Error).message);
       setRetryAction("parse");
     } finally {
@@ -995,7 +1006,7 @@ export default function App() {
             {unsavedScenes.filter((s) => s !== scenario).map((s) => <button key={s} disabled={!!busy} onClick={() => void load(s)}>{SCENARIOS[s].title}</button>)}
           </div>}
           {historyWarning && <div className="message error history-save-warning" role="alert"><AlertTriangle size={17}/><span>{historyWarning}</span></div>}
-          {notice && !constraintEditor && !addingActivity && !editingActivity && !resourcesOpen && !help && !confirmation && !selected && !repeatActivity && !onboarding && !pendingText && (
+          {notice && !constraintEditor && !addingActivity && !editingActivity && !resourcesOpen && !help && !confirmation && !selected && !repeatActivity && !onboarding && !pendingText && !scenarioHint && (
             <div className="toast" role="status">
               <CheckCircle2 size={17} />
               {notice}
@@ -1134,7 +1145,7 @@ export default function App() {
                   clearContent={() => setConfirmation("clear-all")}
                   clearConstraints={() => setConfirmation("clear-constraints")}
                   clearActivities={() => setConfirmation("clear-activities")}
-                  parse={parse}
+                  parse={() => parse()}
                   scenario={scenario}
                   summary={summary}
                   warnings={warnings}
@@ -1194,6 +1205,16 @@ export default function App() {
           )}
         </main>
       </div>
+      {scenarioHint && <Dialog title="这段需求更适合个人周计划" onClose={() => setScenarioHint(null)}>
+        <div className="replacement-content">
+          <p>当前场景是“{SCENARIOS[scenario].title}”，输入包含个人生活与学习安排。可以切换到“{SCENARIOS[scenarioHint.target].title}”，需求文字会一起带过去。</p>
+          <p>各场景已有的任务会保留。切换后点击“识别约束”，再检查新识别的任务。</p>
+          <div className="replacement-actions">
+            <button className="secondary" disabled={!!busy} onClick={() => { setScenarioHint(null); void parse(true); }}>仍在当前场景识别</button>
+            <button className="primary" disabled={!!busy} onClick={() => { const hint = scenarioHint; setScenarioHint(null); void load(hint.target, false, hint.input); }}>切换并带入需求</button>
+          </div>
+        </div>
+      </Dialog>}
       {pendingText && <Dialog title="导入文字到输入框" onClose={() => setPendingText(null)}>
         <div className="text-import-preview"><p><strong>{pendingText.filename}</strong> · 已提取 {pendingText.chars.toLocaleString()} 字</p>
           <pre>{pendingText.text.slice(0, 700)}{pendingText.text.length > 700 ? "\n…（其余文字会完整导入）" : ""}</pre>

@@ -151,6 +151,7 @@ class SolveRequest(BaseModel):
 class ParseRequest(BaseModel):
     problem: Problem
     text: str = Field(min_length=1, max_length=4000)
+    allow_scenario_mismatch: bool = False
 
 
 class RepairRequest(SolveRequest):

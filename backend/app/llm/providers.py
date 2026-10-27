@@ -2,10 +2,13 @@
 import json
 import os
 import re
+import logging
+from time import monotonic
 from uuid import uuid4
 from typing import Protocol
 import httpx
 from .model_http import model_client
+from .parse_support import completion_content, parse_prompt, parse_token_limit, repair_feedback, IncompleteParse, ProviderStopped
 from pydantic import BaseModel, Field, StrictStr
 from ..schemas import Problem, Activity, Constraint
 
@@ -29,6 +32,10 @@ def request_options(provider: str) -> dict:
 def parse_failure_message(error: Exception) -> str:
     # Never include raw exception text: it can contain credentials, URLs or model input.
     prefix = '模型解析未成功：'
+    if isinstance(error, ProviderStopped):
+        return prefix + '模型服务没有完成此次识别，当前输入已保留，请稍后重试。'
+    if isinstance(error, IncompleteParse):
+        return prefix + '模型返回内容被截断，尚未形成完整任务。当前输入已保留，请重试识别或分段输入。'
     if isinstance(error, httpx.HTTPStatusError):
         status = error.response.status_code
         hint = ('请检查密钥权限或网关访问限制。' if status in (401, 403) else
@@ -42,7 +49,7 @@ def parse_failure_message(error: Exception) -> str:
         if 'CERTIFICATE_VERIFY_FAILED' in str(error):
             return prefix + '模型接口 HTTPS 证书校验失败，请检查网关证书配置。'
         return prefix + '服务器无法连接模型接口，请检查地址和网络可达性。'
-    return prefix + '模型返回数据未通过 JSON 或任务约束校验，请重试或使用手工约束。'
+    return prefix + '识别结果仍有任务、资源或时间字段未通过校验，当前输入已保留。请重试识别，或分成两段输入。'
 
 
 class APIProvider:
@@ -58,19 +65,42 @@ class APIProvider:
         base = (os.getenv(f'{prefix}_BASE_URL') or default_base).rstrip('/')
         model = os.getenv(f'{prefix}_MODEL','gpt-4.1-mini' if self.provider=='openai' else 'deepseek-flash')
         timeout = float(os.getenv(f'{prefix}_TIMEOUT', '90' if self.provider == 'deepseek' else '35'))
-        prompt = ('你是约束解析器，不安排日程。只返回 JSON 对象，包含 problem（完整修改后的问题）、summary（变更说明字符串数组）、warnings（歧义或不支持项字符串数组）。'
-                  '每个 slot=30分钟，周一=0，start/end是当天slot；deadline.end是从周一00:00开始的slot。必须保留未修改的输入。'
-                  '不能凭空创造课程、设备或人员，未知实体和歧义写入warnings。只使用给定Schema支持的类型。preferred_window必须soft，其余hard。'
-                  '重复活动展开为独立实例；学习可拆分为多项；不得输出调度结果、代码或表达式。Schema:\n'+json.dumps(Problem.model_json_schema(),ensure_ascii=False))
+        messages = [{'role': 'system', 'content': parse_prompt(problem)}, {'role': 'user', 'content':
+            json.dumps({'current_problem': problem.model_dump(exclude_defaults=True), 'request': text}, ensure_ascii=False, separators=(',', ':'))}]
+        deadline = monotonic() + timeout
+        token_limit = parse_token_limit(self.provider)
         try:
-            with model_client(timeout) as client:
-                response=client.post(base+'/chat/completions',headers={'Authorization':f'Bearer {key}'},json={'model':model,'temperature':0,'response_format':{'type':'json_object'},'messages':[{'role':'system','content':prompt},{'role':'user','content':json.dumps({'current_problem':problem.model_dump(),'request':text},ensure_ascii=False)}],**request_options(self.provider)})
-                response.raise_for_status()
-                content=response.json()['choices'][0]['message']['content']
-                if not isinstance(content,str):
-                    raise ValueError('模型未返回 JSON 文本。')
-                data=json.loads(content)
-            return validate_parse(data,self.provider)
+            for attempt in range(2):
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    raise httpx.ReadTimeout('模型解析达到总等待时限。')
+                with model_client(remaining) as client:
+                    response = client.post(base+'/chat/completions', headers={'Authorization': f'Bearer {key}'},
+                        json={'model': model, 'temperature': 0, 'max_tokens': token_limit,
+                              'response_format': {'type': 'json_object'}, 'messages': messages, **request_options(self.provider)})
+                    response.raise_for_status()
+                    envelope = response.json()
+                try:
+                    content = completion_content(envelope)
+                    parsed = validate_parse(json.loads(content), self.provider, expected=problem)
+                    return {**parsed, 'parse_attempts': attempt + 1}
+                except (ValueError, KeyError, IndexError, TypeError) as invalid:
+                    if isinstance(invalid, ProviderStopped):
+                        raise
+                    # Log only error types and attempt counts, never input/output, headers or credentials.
+                    logging.getLogger(__name__).warning('constraint_parse_invalid provider=%s error=%s attempt=%d',
+                                                       self.provider, type(invalid).__name__, attempt + 1)
+                    if attempt == 1 or deadline - monotonic() < 2:
+                        raise
+                    # Regenerate once from the original request plus exact validator feedback.
+                    # A truncated or invalid response is never partially accepted or sent to the solver.
+                    try:
+                        rejected = envelope['choices'][0]['message']['content']
+                    except (KeyError, IndexError, TypeError):
+                        rejected = None
+                    prior = [{'role': 'assistant', 'content': rejected}] if isinstance(rejected, str) and rejected.strip() else []
+                    messages = [*messages, *prior, {'role': 'user', 'content': repair_feedback(invalid)}]
+                    token_limit = min(32768, token_limit * 2)
         except (httpx.HTTPError,KeyError,IndexError,TypeError,ValueError) as exc:
             raise ValueError(parse_failure_message(exc)) from exc
 
@@ -134,8 +164,10 @@ def validate_schedule(data, problem: Problem):
     return out
 
 
-def validate_parse(data, provider):
+def validate_parse(data, provider, expected=None):
     parsed=ParsedConstraints.model_validate(data)
+    if expected is not None and (parsed.problem.scenario != expected.scenario or parsed.problem.week_start != expected.week_start):
+        raise ValueError('模型不得擅自改变当前场景或所在周。')
     return {**parsed.model_dump(),'provider':provider,'requires_review':True}
 
 

@@ -1,0 +1,253 @@
+{
+  "version": "0.2.3",
+  "backend": {
+    "passed": 184,
+    "failed": 0,
+    "skipped": 1
+  },
+  "browser_suites": [
+    {
+      "suite": "check_brand_upgrade",
+      "passed_groups": 6,
+      "checks": [
+        "New title, wordmark, clock symbol and favicon share the OptiDay identity",
+        "Sampled calendar category text reaches a 4.5:1 contrast ratio after the palette change",
+        "Existing browser tasks, draft, result and chosen week survive rename and reload",
+        "History from the previous browser format remains readable and restorable",
+        "A previous backup restores safely; new backups use OptiDay names and keep the data intact",
+        "Export filenames and PDF metadata carry the new product identity"
+      ],
+      "page_errors": []
+    },
+    {
+      "suite": "check_browser_storage",
+      "passed_groups": 12,
+      "checks": [
+        "unparsed text and last result survive immediate refresh without solving",
+        "unconfirmed task/constraint draft, custom weights and previous assignments survive refresh",
+        "scenario switching restores separate workspaces without solving again",
+        "confirmed restored draft solves using saved weights and previous schedule",
+        "closing and reopening browser restores last active scenario from disk",
+        "reset replaces only the current scenario",
+        "multiple tabs preserve each other's edits to different scenarios",
+        "same-scenario stale tabs cannot overwrite newer edits and explicit conflict choices work",
+        "a workspace deleted in another tab still offers a safe keep-current recovery",
+        "different browser profiles keep independent content",
+        "malformed stored JSON and invalid workspace shape recover without blank page",
+        "storage quota failure is visible and does not break scheduling"
+      ],
+      "page_errors": []
+    },
+    {
+      "suite": "check_gray_workflows",
+      "passed_groups": 14,
+      "checks": [
+        "Search has a clear empty state; newly added tasks remain visible",
+        "Changing the last activity category removes orphan category rules visibly and supports Undo",
+        "TXT import previews, cancels, appends or replaces, and Undo restores original input on mobile",
+        "A newline at the 4000-character boundary cannot create an oversized request or lose the tail",
+        "An optional priority change is protected as a draft and changes the real solver choice",
+        "Exports cannot interrupt the global busy state during a solve",
+        "A newly created room-booking task really allocates a meeting room",
+        "Busy-service errors preserve the last plan and allow a real retry without AbortSignal.timeout support",
+        "A stalled binary export times out and restores controls without altering the plan",
+        "A failed upload restores the controls and preserves input",
+        "Quota failure keeps drafts across scene switches; restoring storage persists the draft",
+        "Saving one scene cannot resurrect a different scene deleted by another tab",
+        "Undoing a cross-scene restore cannot delete a newer edit from another tab",
+        "Repeated tasks protect selected dates and support maximum-length activity names"
+      ],
+      "page_errors": []
+    },
+    {
+      "suite": "check_product_workflows",
+      "passed_groups": 11,
+      "checks": [
+        "a new browser starts blank and loads a full example only after explicit selection",
+        "public server history does not disclose visitor problems or results",
+        "destructive replacement can be cancelled or undone without losing the original plan",
+        "a new personal plan uses the selected Monday and rescheduling reports actual preserved assignments",
+        "resource changes are validated, require review, and cannot delete an in-use resource",
+        "undoing a cross-scenario import restores the overwritten destination workspace",
+        "separate browser profiles see only their own locally saved solve history",
+        "backup restores tasks on another browser and survives reload without accepting imported solver results",
+        "invalid backup is rejected without modifying existing browser content",
+        "history-only storage failure stays visible even when workspace autosave succeeds",
+        "mobile workspace actions remain visible without page overflow"
+      ],
+      "page_errors": []
+    },
+    {
+      "suite": "check_resource_workflows",
+      "passed_groups": 11,
+      "checks": [
+        "new course stores class + teacher, candidate rooms, seats, room type and weekday time window through real validation",
+        "editing without touching advanced settings preserves every existing activity field including multiple resources and room choices",
+        "CP-SAT returns a checked legal course schedule and assigns the matching lecture room",
+        "resources referenced by activities and candidate rooms cannot be removed or changed away from room type",
+        "blank resource names and zero quantities are blocked inline without reaching the backend; valid additions are persisted",
+        "unused resources can be removed and the real validated problem no longer contains them",
+        "a resource referenced only by a constraint is protected and its real unavailable time is displayed",
+        "laboratory task demands two centrifuges and a matching lab; quantity survives editing and CP-SAT independently validates its schedule",
+        "invalid windows, room requirements without a candidate, and zero equipment demand are rejected with actionable inline errors",
+        "resource and activity dialogs fit a 390 px phone with reachable save buttons and no horizontal overflow",
+        "production machine candidates retain their types and validate unchanged; a2.5h operation is allocated to one of two machines by CP-SAT"
+      ],
+      "page_errors": []
+    },
+    {
+      "suite": "check_ui_regressions",
+      "passed_groups": 10,
+      "checks": [
+        "mobile toast stays within viewport during its entry animation",
+        "switching to robust mode sends the existing schedule and enables stability",
+        "stability slider matches the real 1000 preset and editing weights does not claim they are applied",
+        "blank name is rejected; all48 half-hour durations include validated2.5h; unreviewed drafts cannot apply weights",
+        "dirty draft close preserves input; Tab/ShiftTab stay inside dialog; discarded close restores opener focus",
+        "invalid time window is rejected inline without an API call; corrected form passes real server validation",
+        "constraint type switches send the target, day and deadline displayed in the form",
+        "meeting and production legend colors match actual calendar events",
+        "midday deadlines display exact stored time; half-hour edit updates solver fields and actual constraint card despite unchanged note",
+        "sleep banner preserves half-hour precision and reports varying durations truthfully"
+      ],
+      "page_errors": []
+    },
+    {
+      "suite": "check_usability_workflows",
+      "passed_groups": 15,
+      "checks": [
+        {
+          "name": "new visitor starts blank and explicitly chooses a real solved example",
+          "passed": true,
+          "seconds": 6.08,
+          "detail": {
+            "initial_activities": 0,
+            "explicit_sample_scheduled": 35,
+            "week_start": "2026-10-26"
+          }
+        },
+        {
+          "name": "unparsed text cannot silently be ignored by Optimize",
+          "passed": true,
+          "seconds": 1.0,
+          "detail": "New text blocks optimization until explicitly interpreted or intentionally excluded."
+        },
+        {
+          "name": "clear input has a real Undo without losing the plan",
+          "passed": true,
+          "seconds": 0.98,
+          "detail": "Clear input preserves the existing model/result and restores text with Undo."
+        },
+        {
+          "name": "consecutive activity deletes can each be undone and session boundaries preserve saved work",
+          "passed": true,
+          "seconds": 1.99,
+          "detail": "Two consecutive deletes Undo in reverse order and restore the whole real solved plan; reload clears session Undo while keeping the saved draft."
+        },
+        {
+          "name": "same-scenario multi-tab autosave protects latest data and opens it on request",
+          "passed": true,
+          "seconds": 2.47,
+          "detail": "A stale same-scenario tab cannot overwrite newer data via a view switch; latest content can be reopened."
+        },
+        {
+          "name": "same-scenario local replacement is explicit and warns the other tab",
+          "passed": true,
+          "seconds": 1.72,
+          "detail": "Replacing another tab is an explicit choice; that tab receives its own conflict warning."
+        },
+        {
+          "name": "another tab clearing storage leaves an actionable conflict and current data can be kept",
+          "passed": true,
+          "seconds": 2.47,
+          "detail": "Storage clear in another tab produces an actionable warning; data is restored only by the explicit keep-current choice."
+        },
+        {
+          "name": "delayed date validation cannot race a second date or scenario switch",
+          "passed": true,
+          "seconds": 0.99,
+          "detail": "Date validation seals global mutation controls until the real validation response returns."
+        },
+        {
+          "name": "delayed editor save cannot overwrite a newly selected scenario",
+          "passed": true,
+          "seconds": 1.2,
+          "detail": "Saving dialog cannot close or change scenario while validation is pending; delayed save applies only to its own scene."
+        },
+        {
+          "name": "backup retains previous baseline when the last solve has no assignments",
+          "passed": true,
+          "seconds": 1.19,
+          "detail": "An INFEASIBLE backup with empty assignments retains its last real feasible baseline and requires review."
+        },
+        {
+          "name": "downloaded plan JSON can be restored through backup import",
+          "passed": true,
+          "seconds": 2.08,
+          "detail": "The actual downloaded plan JSON restores editable data and previous assignments without importing untrusted approval."
+        },
+        {
+          "name": "real repair has a complete Undo",
+          "passed": true,
+          "seconds": 0.91,
+          "detail": "Repair removed one constraint and found a real legal schedule; Undo restores the complete original conflict workspace."
+        },
+        {
+          "name": "long text imports and successive parse segments never lose their tail",
+          "passed": true,
+          "seconds": 1.42,
+          "detail": {
+            "imported_chars": 4880,
+            "segments": [
+              4000,
+              880
+            ],
+            "tail_preserved": true,
+            "parser": "controlled response; real validation; no paid model"
+          }
+        },
+        {
+          "name": "repeat activity generates distinct IDs and all copies are genuinely solved",
+          "passed": true,
+          "seconds": 1.53,
+          "detail": {
+            "unique_activities": 3,
+            "scheduled": 3,
+            "hard_violations": 0
+          }
+        },
+        {
+          "name": "repeating a dated time window moves it to Wednesday while preserving absolute deadlines",
+          "passed": true,
+          "seconds": 1.36,
+          "detail": {
+            "original_day": 0,
+            "copied_day": 2,
+            "time_window": [
+              16,
+              20
+            ],
+            "deadline_kept_absolute": 144,
+            "scheduled": 2,
+            "hard_violations": 0
+          }
+        }
+      ],
+      "page_errors": []
+    },
+    {
+      "suite": "parse-browser",
+      "passed_groups": 5,
+      "checks": [
+        "A personal weekly request in the production scene gets a clear suggestion before a model call",
+        "Cancelling the suggestion preserves the complete input",
+        "Switching carries the text without losing either scene or the destination draft; Undo restores it",
+        "After switching, the complete text goes to the correct scene and a recovered draft still requires review",
+        "An explicit user choice can keep the current scene without a suggestion loop or input loss"
+      ],
+      "page_errors": []
+    }
+  ],
+  "live_long_text_verified": false,
+  "browser_groups": 84
+}

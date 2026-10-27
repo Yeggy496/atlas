@@ -1,3 +1,17 @@
+export class ApiError extends Error {
+  code?: string;
+  suggestedScenario?: string;
+  constructor(message: string, public status: number, detail: unknown) {
+    super(message);
+    this.name = "ApiError";
+    if (detail && typeof detail === "object") {
+      const fields = detail as Record<string, unknown>;
+      if (typeof fields.code === "string") this.code = fields.code;
+      if (typeof fields.suggested_scenario === "string") this.suggestedScenario = fields.suggested_scenario;
+    }
+  }
+}
+
 export async function readResponse<T>(response: Response): Promise<T> {
   let data;
   try {
@@ -11,12 +25,14 @@ export async function readResponse<T>(response: Response): Promise<T> {
   }
   if (!response.ok) {
     const detail = data?.detail;
-    throw new Error(
+    throw new ApiError(
       typeof detail === "string"
         ? detail
         : Array.isArray(detail)
           ? detail.map((x: { msg: string }) => x.msg).join("；")
+          : typeof detail?.message === "string" ? detail.message
           : "请求失败，请重试。",
+      response.status, detail,
     );
   }
   return data as T;
