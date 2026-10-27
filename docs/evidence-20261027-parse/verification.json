@@ -248,6 +248,72 @@
       "page_errors": []
     }
   ],
-  "live_long_text_verified": false,
-  "browser_groups": 84
+  "live_long_text_verified": true,
+  "browser_groups": 84,
+  "live_verification": {
+    "target": "https://atlas-ptbu.onrender.com",
+    "verified": true,
+    "model_calls": 1,
+    "health": {
+      "status": "ok",
+      "product": "OptiDay",
+      "version": "0.2.3",
+      "solver": "OR-Tools CP-SAT",
+      "provider": "deepseek",
+      "slot_minutes": 30,
+      "model_configured": true,
+      "parser_type": "model",
+      "history_scope": "browser"
+    },
+    "scenario_suggestion_http": 409,
+    "scenario_suggestion": "life",
+    "parse_http": 200,
+    "parse_seconds": 12.51,
+    "activities": 47,
+    "constraints": 54,
+    "requires_review": true,
+    "warnings": [
+      "“尽量放在下午”和“最好在17点以后”作为软偏好处理，不保证一定满足",
+      "阅读和游戏为可选活动，若时间不足可不安排",
+      "未指定洗衣服和采购的具体周末日期，仅限制在周六或周日"
+    ],
+    "unreviewed_http": 409,
+    "solve": {
+      "http": 200,
+      "status": "FEASIBLE",
+      "scheduled": 47,
+      "hard_violations": 0,
+      "seconds": 29.998
+    }
+  },
+  "live_semantic_checks": {
+    "passed_checks": 22,
+    "checks": [
+      "47个识别任务全部排入且独立校验无硬约束违反",
+      "睡眠每天一次、时长和窗口正确",
+      "午饭每天一次、时长和窗口正确",
+      "晚饭每天一次、时长和窗口正确",
+      "高等数学固定时间正确",
+      "大学英语固定时间正确",
+      "数据结构固定时间正确",
+      "机器学习固定时间正确",
+      "线性代数固定时间正确",
+      "项目组会议固定时间正确",
+      "实验课固定时间正确",
+      "家庭活动固定时间正确",
+      "高数作业2次各1.5小时、周三开始前完成",
+      "Python次数、总时长和分日正确",
+      "英语复习次数、总时长和分日正确",
+      "跑步次数、总时长和分日正确",
+      "实验数据整理1小时后连续写报告2小时，截止时间正确",
+      "洗衣服1小时且在周末",
+      "采购1小时且在周末",
+      "阅读2次和游戏1次为可选活动",
+      "游戏位于周六20:00-22:00",
+      "学习、复习、作业在08:00-21:30内且每次不超过2小时"
+    ],
+    "review_notes": [
+      "模型额外添加了高数作业每天最多一次，原文只要求分两次；此额外限制应由用户在复核时决定是否保留。"
+    ]
+  }
 }
