@@ -2,7 +2,7 @@
   min-width: 0;
 }
 .resource-manager-intro {
-  color: #6b7c96;
+  color: #616c65;
   font-size: 12px;
   line-height: 1.8;
   margin: -8px 0 16px;
@@ -17,7 +17,7 @@
   align-items: center;
   flex: 1;
   min-width: 0;
-  color: #8698b3;
+  color: #76847b;
   position: relative;
 }
 .resource-manager-search > svg {
@@ -35,7 +35,7 @@
   padding: 0 11px;
 }
 .resource-manager-count {
-  color: #8696ad;
+  color: #748279;
   font-size: 11px;
   margin: 12px 0 8px;
 }
@@ -52,7 +52,7 @@
   width: 100%;
   text-align: left;
   padding: 13px 2px;
-  color: #6f819f;
+  color: #66726a;
 }
 .resource-manager-toggle > span {
   min-width: 0;
@@ -60,7 +60,7 @@
 .resource-manager-toggle strong {
   font-size: 12px;
   font-weight: 600;
-  color: #415779;
+  color: #464e49;
   overflow-wrap: anywhere;
 }
 .resource-manager-toggle small {
@@ -68,7 +68,7 @@
   font-size: 10px;
   line-height: 1.6;
   margin-top: 4px;
-  color: #8293ad;
+  color: #738077;
 }
 .resource-manager-toggle > svg {
   flex-shrink: 0;
@@ -83,7 +83,7 @@
 .resource-manager-fields > label,
 .resource-manager-grid > label {
   display: block;
-  color: #7487a3;
+  color: #69766e;
   font-size: 11px;
   margin-bottom: 12px;
   min-width: 0;
@@ -95,7 +95,7 @@
 }
 .resource-manager-hint,
 .resource-manager-note {
-  color: #8495ac;
+  color: #738077;
   font-size: 10px;
   line-height: 1.8;
 }
@@ -106,17 +106,17 @@
   margin: 15px 0 10px;
 }
 .resource-manager-usage {
-  background: #f6f8fd;
-  border-left: 2px solid #c9d7f2;
+  background: #f9faf9;
+  border-left: 2px solid #5c9e7d;
   padding: 10px 12px;
   margin: 12px 0;
   font-size: 10px;
   line-height: 1.8;
-  color: #7b8da8;
+  color: #6e7b72;
 }
 .resource-manager-usage > strong {
   font-weight: 600;
-  color: #607895;
+  color: #5d6760;
 }
 .resource-manager-reference-names {
   overflow-wrap: anywhere;
@@ -139,7 +139,7 @@
 }
 .resource-manager-delete-row > span {
   font-size: 10px;
-  color: #8d9cb3;
+  color: #79877e;
 }
 .resource-manager-error {
   line-height: 1.8;
@@ -150,7 +150,7 @@
   font-size: 11px;
   line-height: 1.8;
   padding: 26px 10px;
-  color: #8b9bb4;
+  color: #79877d;
   text-align: center;
 }
 @media (max-width: 440px) {

@@ -187,7 +187,7 @@
     height: 20px;
   }
   .scenario-nav.selected {
-    background: #edf2ff;
+    background: #f5f7f6;
   }
   .scenarios-label + .scenario-nav {
     margin-top: 24px;
@@ -433,64 +433,43 @@
 }
 .constraint-card p,
 .activity-row strong {
-  color: #526681;
+  color: #505953;
 }
 .nl-input textarea {
-  color: #536882;
-}
-.calendar-event.blue {
-  color: #47689f;
-}
-.calendar-event.purple {
-  color: #7758a6;
-}
-.calendar-event.teal {
-  color: #438575;
-}
-.calendar-event.orange {
-  color: #a4713d;
-}
-.calendar-event.slate {
-  color: #71829b;
-}
-.calendar-event.pink {
-  color: #a16a88;
-}
-.calendar-event small {
-  opacity: 0.85;
+  color: #515a54;
 }
 .page-heading p {
-  color: #71839d;
+  color: #66726a;
 }
 .review-check {
-  color: #637c9f;
+  color: #626d65;
 }
 .provider-note {
-  color: #8a9db8;
+  color: #7a887e;
 }
 .mode-selector button {
   font-size: 11px;
 }
 .optimization-controls > p {
   font-size: 10px;
-  color: #8093b1;
+  color: #738178;
 }
 .calendar-event .event-location {
   opacity: 0.8;
 }
 .modal label {
-  color: #637b9d !important;
+  color: #616c65 !important;
 }
 .modal input,
 .modal select {
-  color: #4d678f !important;
+  color: #535d56 !important;
 }
 .form-note {
-  color: #7489aa;
+  color: #6c7970;
 }
 .modal-backdrop .help-content p,
 .event-detail ul {
-  color: #7187a8;
+  color: #6a776e;
 }
 .conflict-view > p,
 .conflict-item p,
@@ -498,16 +477,16 @@
   color: #9e8173;
 }
 .repair-list strong {
-  color: #637fa9;
+  color: #657169;
 }
 .parse-warning {
   color: #917742;
 }
 .objective-details section span {
-  color: #7186a8;
+  color: #6a776e;
 }
 .objective-details summary {
-  color: #6d85ae;
+  color: #6b776f;
 }
 .solver-strip > div > span {
   color: #668b78;
@@ -522,7 +501,7 @@ body:has(.modal-backdrop) .message.error {
   transform: translateX(-50%);
   z-index: 210;
   max-width: 90vw;
-  box-shadow: 0 5px 25px #17264130;
+  box-shadow: 0 5px 25px #33574530;
 }
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -546,17 +525,17 @@ body:has(.modal-backdrop) .message.error {
   height: 32px;
   padding: 0 12px;
   border-radius: 16px;
-  border: 1px solid #e5eaf3;
+  border: 1px solid #eaeeeb;
   background: #fff;
-  color: #7f8a9e;
+  color: #6c7870;
   font-size: 12px;
   gap: 6px;
   white-space: nowrap;
 }
 .scenario-chip.active {
-  color: #365bd6;
-  border-color: #c9d6fb;
-  background: #f7f9ff;
+  color: #365d4c;
+  border-color: #e0e4e1;
+  background: #fbfbfb;
   font-weight: 600;
 }
 @media (max-width: 760px) {

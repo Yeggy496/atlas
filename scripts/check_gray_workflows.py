@@ -40,7 +40,7 @@ with sync_playwright() as playwright:
         workspace = workspace or ws()
         s = workspace['problem']['scenario']
         data = {'schema_version': 1, 'active_scenario': s, 'workspaces': {s: workspace, **(others or {})}}
-        context.add_init_script('if(!localStorage.getItem("atlas.workspace.v1"))localStorage.setItem("atlas.workspace.v1",' + json.dumps(json.dumps(data, ensure_ascii=False)) + ')')
+        context.add_init_script('if(!localStorage.getItem("optiday.workspace.v1"))localStorage.setItem("optiday.workspace.v1",' + json.dumps(json.dumps(data, ensure_ascii=False)) + ')')
         if init:
             context.add_init_script(init)
         page = context.new_page()
@@ -49,7 +49,7 @@ with sync_playwright() as playwright:
         return context, page
 
     def saved(page, scenario='life'):
-        return page.evaluate('(s)=>JSON.parse(localStorage.getItem("atlas.workspace.v1")).workspaces[s]', scenario)
+        return page.evaluate('(s)=>JSON.parse(localStorage.getItem("optiday.workspace.v1")).workspaces[s]', scenario)
 
     def submit(page, name):
         dialog = page.get_by_role('dialog')
@@ -221,7 +221,7 @@ with sync_playwright() as playwright:
     academic.update(activities=[], constraints=[])
     context, page = profile(others={'academic': ws(academic)})
     page.evaluate('''()=>{const original=Storage.prototype.setItem;window.restoreStorage=()=>{Storage.prototype.setItem=original};
-        Storage.prototype.setItem=function(k,v){if(k==='atlas.workspace.v1')throw new DOMException('full','QuotaExceededError');return original.call(this,k,v)}}''')
+        Storage.prototype.setItem=function(k,v){if(k==='optiday.workspace.v1')throw new DOMException('full','QuotaExceededError');return original.call(this,k,v)}}''')
     page.get_by_label('自然语言需求').fill('不能丢失的未保存草稿')
     expect(page.locator('.storage-warning').first).to_be_visible()
     page.get_by_role('button', name='智能排课', exact=True).click()
@@ -238,18 +238,18 @@ with sync_playwright() as playwright:
     context, page = profile(others={'academic': ws(academic)})
     other = context.new_page()
     other.goto(url, wait_until='networkidle')
-    other.evaluate('''()=>{const d=JSON.parse(localStorage.getItem('atlas.workspace.v1'));delete d.workspaces.academic;localStorage.setItem('atlas.workspace.v1',JSON.stringify(d))}''')
+    other.evaluate('''()=>{const d=JSON.parse(localStorage.getItem('optiday.workspace.v1'));delete d.workspaces.academic;localStorage.setItem('optiday.workspace.v1',JSON.stringify(d))}''')
     page.get_by_label('自然语言需求').fill('个人新草稿')
-    assert not page.evaluate('!!JSON.parse(localStorage.getItem("atlas.workspace.v1")).workspaces.academic')
+    assert not page.evaluate('!!JSON.parse(localStorage.getItem("optiday.workspace.v1")).workspaces.academic')
     report['checks'].append('Saving one scene cannot resurrect a different scene deleted by another tab')
     context.close()
 
     context, page = profile()
     source = ws(academic)
-    backup = json.dumps({'format': 'atlas-workspace', 'version': 1, 'workspace': source}).encode()
+    backup = json.dumps({'format': 'optiday-workspace', 'version': 1, 'workspace': source}).encode()
     page.locator('input[aria-label="选择工作空间备份"]').set_input_files({'name': 'academic.json', 'mimeType': 'application/json', 'buffer': backup})
     page.get_by_role('dialog').get_by_role('button', name='确认恢复', exact=True).click()
-    page.wait_for_function('!!JSON.parse(localStorage.getItem("atlas.workspace.v1")).workspaces.academic')
+    page.wait_for_function('!!JSON.parse(localStorage.getItem("optiday.workspace.v1")).workspaces.academic')
     other = context.new_page()
     other.goto(url, wait_until='networkidle')
     other.get_by_label('自然语言需求').fill('另一标签页刚刚写入的排课需求')

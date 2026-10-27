@@ -1,5 +1,6 @@
 from collections import defaultdict
 import os
+from ..config import env
 from ortools.sat.python import cp_model
 from ..schemas import Problem, Assignment
 from .constraints import candidates, applies, preference_cost
@@ -21,7 +22,7 @@ WEIGHTS = {
 # 修复流程必须最小化改动，因此无论当前是哪个档位都强制启用稳定性项。
 REPAIR_STABILITY = 1000
 # “稳健”档要求截止任务至少预留的半小时数（默认 6 小时）。
-ROBUST_BUFFER_SLOTS = int(os.getenv('ATLAS_ROBUST_BUFFER_SLOTS', '12'))
+ROBUST_BUFFER_SLOTS = int(env('OPTIDAY_ROBUST_BUFFER_SLOTS', '12'))
 
 
 def solve(problem: Problem, mode='balanced', previous=None, seconds=None, optimize=True, keep_previous=False, overrides=None):
@@ -34,7 +35,7 @@ def solve(problem: Problem, mode='balanced', previous=None, seconds=None, optimi
     negative values are ignored rather than trusted.
     """
     if seconds is None:
-        seconds = float(os.getenv('ATLAS_SOLVE_SECONDS', '4'))
+        seconds = float(env('OPTIDAY_SOLVE_SECONDS', '4'))
     weights = dict(WEIGHTS[mode])
     if overrides:
         for key, value in overrides.items():
@@ -165,7 +166,7 @@ def solve(problem: Problem, mode='balanced', previous=None, seconds=None, optimi
         model.minimize(sum(weights[k]*sum(v) for k,v in terms.items()))
     solver = cp_model.CpSolver()
     solver.parameters.max_time_in_seconds = seconds
-    solver.parameters.num_search_workers = int(os.getenv('ATLAS_SOLVER_WORKERS', '4'))
+    solver.parameters.num_search_workers = int(env('OPTIDAY_SOLVER_WORKERS', '4'))
     solver.parameters.random_seed = 42
     status = solver.solve(model)
     name = solver.status_name(status)

@@ -28,11 +28,11 @@ if args.proxy:
 
 
 def stored(page, scenario):
-    return page.evaluate('(scenario) => JSON.parse(localStorage.getItem("atlas.workspace.v1")).workspaces[scenario]', scenario)
+    return page.evaluate('(scenario) => JSON.parse(localStorage.getItem("optiday.workspace.v1")).workspaces[scenario]', scenario)
 
 
 def wait_for_activity(page, scenario, name):
-    page.wait_for_function('''({scenario, name}) => JSON.parse(localStorage.getItem('atlas.workspace.v1'))
+    page.wait_for_function('''({scenario, name}) => JSON.parse(localStorage.getItem('optiday.workspace.v1'))
         ?.workspaces[scenario]?.problem.activities.some(a => a.name === name)''', arg={'scenario': scenario, 'name': name})
     return next(a for a in stored(page, scenario)['problem']['activities'] if a['name'] == name)
 
@@ -188,7 +188,7 @@ try:
         section.get_by_label('同时可用数量', exact=True).fill('2')
         check_mobile(page, dialog, 'resource-manager-mobile-20261014.png')
         validate_submit(page, dialog, '保存资源')
-        page.wait_for_function('''() => JSON.parse(localStorage.getItem('atlas.workspace.v1'))
+        page.wait_for_function('''() => JSON.parse(localStorage.getItem('optiday.workspace.v1'))
             .workspaces.academic.problem.resources.some(r => r.name === '备用设备测试')''')
         report['checks'].append('blank resource names and zero quantities are blocked inline without reaching the backend; valid additions are persisted')
         dialog = open_manager(page)
@@ -196,7 +196,7 @@ try:
         expect(section.get_by_role('button', name='删除资源', exact=True)).to_be_enabled()
         section.get_by_role('button', name='删除资源', exact=True).click()
         validate_submit(page, dialog, '保存资源')
-        page.wait_for_function('''() => !JSON.parse(localStorage.getItem('atlas.workspace.v1'))
+        page.wait_for_function('''() => !JSON.parse(localStorage.getItem('optiday.workspace.v1'))
             .workspaces.academic.problem.resources.some(r => r.name === '备用设备测试')''')
         report['checks'].append('unused resources can be removed and the real validated problem no longer contains them')
 
@@ -206,7 +206,7 @@ try:
         section.get_by_label('资源名称', exact=True).fill('仅约束引用设备')
         section.get_by_label('资源类型', exact=True).select_option('equipment')
         validate_submit(page, dialog, '保存资源')
-        page.wait_for_function('''() => JSON.parse(localStorage.getItem('atlas.workspace.v1'))
+        page.wait_for_function('''() => JSON.parse(localStorage.getItem('optiday.workspace.v1'))
             .workspaces.academic.problem.resources.some(r => r.name === '仅约束引用设备')''')
         resource = next(r for r in stored(page, 'academic')['problem']['resources'] if r['name'] == '仅约束引用设备')
         page.get_by_role('button', name='添加约束', exact=True).click()

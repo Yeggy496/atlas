@@ -67,7 +67,7 @@ export async function exportPlan(
   const blob = await response.blob();
   const disposition = response.headers.get("Content-Disposition") ?? "";
   const match = disposition.match(/filename=([^;]+)/i);
-  const filename = match ? match[1].trim() : `atlas-plan.${format}`;
+  const filename = match ? match[1].trim() : `optiday-plan.${format}`;
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;

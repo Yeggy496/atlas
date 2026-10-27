@@ -1,6 +1,6 @@
 """The comparison harness must stay real: no number may drift from a live run.
 
-These tests pin the behaviour the competition report relies on -- ATLAS-Sigma
+These tests pin the behaviour the competition report relies on -- OptiDay
 passes every hard constraint and the baselines do not -- and cover the parsing
 of a Direct-LLM schedule, so the report's "killer table" cannot silently become
 a fabricated one.
@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def load_benchmark():
-    spec = importlib.util.spec_from_file_location('atlas_benchmark', ROOT / 'scripts' / 'benchmark.py')
+    spec = importlib.util.spec_from_file_location('optiday_benchmark', ROOT / 'scripts' / 'benchmark.py')
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
@@ -21,12 +21,12 @@ def load_benchmark():
 bench = load_benchmark()
 
 
-def test_atlas_passes_every_hard_constraint_where_baselines_do_not():
+def test_optiday_passes_every_hard_constraint_where_baselines_do_not():
     problem = bench.ADAPTERS['academic']()
-    atlas_assignments = bench._as_assignments(bench.solve(problem, 'balanced', seconds=3.0)['assignments'])
-    atlas_metrics = bench.compute_metrics(problem, atlas_assignments, 0.0)
-    assert atlas_metrics['hard_violations'] == 0
-    assert atlas_metrics['valid'] is True
+    optiday_assignments = bench._as_assignments(bench.solve(problem, 'balanced', seconds=3.0)['assignments'])
+    optiday_metrics = bench.compute_metrics(problem, optiday_assignments, 0.0)
+    assert optiday_metrics['hard_violations'] == 0
+    assert optiday_metrics['valid'] is True
 
     random_metrics = bench.compute_metrics(problem, bench.random_schedule(problem, seed=0), 0.0)
     greedy_metrics = bench.compute_metrics(problem, bench.greedy_schedule(problem), 0.0)
@@ -45,7 +45,7 @@ def test_llm_proxy_is_deterministic_and_offline():
 
 def test_run_benchmark_records_real_solver_scale():
     problem = bench.ADAPTERS['lab']()
-    rows = bench.run_benchmark([('lab', problem)], ['atlas'], 0, 'demo', 3.0)
+    rows = bench.run_benchmark([('lab', problem)], ['optiday'], 0, 'demo', 3.0)
     solver = rows[0]['solver']
     assert solver['variables'] > 0
     assert solver['model_constraints'] > 0
@@ -71,11 +71,11 @@ def test_validate_schedule_keeps_only_known_activities():
 
 
 def test_render_markdown_has_table4():
-    meta = {'generated_at': 'now', 'provider': 'demo', 'seed': 0, 'atlas_seconds': 4.0, 'methods': ['atlas']}
-    rows = [{'instance': 'lab', 'method': 'atlas', 'hard_violations': 0, 'valid': True,
+    meta = {'generated_at': 'now', 'provider': 'demo', 'seed': 0, 'optiday_seconds': 4.0, 'methods': ['optiday']}
+    rows = [{'instance': 'lab', 'method': 'optiday', 'hard_violations': 0, 'valid': True,
              'preference_score': 1.0, 'fragmentation_slots': 0, 'daily_load_span_hours': 2.0,
              'solve_time': 1.0, 'activities': 6, 'solver': {'variables': 10, 'model_constraints': 12,
                                                             'status': 'OPTIMAL'}}]
     summary = bench.aggregate(rows, ['lab'])
     md = bench.render_markdown(rows, summary, meta)
-    assert 'Hard Violations' in md and 'Preference Score' in md and 'atlas' in md
+    assert 'Hard Violations' in md and 'Preference Score' in md and 'optiday' in md

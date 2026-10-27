@@ -152,7 +152,7 @@ def test_production_build_is_served_from_project_directory():
     with TestClient(app) as client:
         response=client.get('/')
         assert response.status_code==200
-        assert 'ATLAS' in response.text
+        assert 'OptiDay' in response.text
         assert 'text/html' in response.headers['content-type']
 
 def test_production_jobs_keep_operation_order():

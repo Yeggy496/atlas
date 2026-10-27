@@ -1,8 +1,8 @@
 .editor-resource-settings {
   margin: 10px 0 18px;
-  border-top: 1px solid #e9edf4;
-  border-bottom: 1px solid #e9edf4;
-  color: #6d819f;
+  border-top: 1px solid #e1e5df;
+  border-bottom: 1px solid #e1e5df;
+  color: #657169;
 }
 .editor-resource-settings > summary {
   padding: 14px 2px;
@@ -14,7 +14,7 @@
   padding-left: 15px;
   margin-top: 5px;
   font-size: 10px;
-  color: #8596af;
+  color: #748279;
   line-height: 1.7;
 }
 .editor-resource-body {
@@ -30,12 +30,12 @@
   font-size: 11px;
   font-weight: 600;
   padding: 0;
-  color: #526d92;
+  color: #56605a;
 }
 .editor-resource-group > p {
   font-size: 10px;
   line-height: 1.8;
-  color: #8597b1;
+  color: #75837a;
   margin: 6px 0 10px;
 }
 .editor-resource-choice {
@@ -44,7 +44,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 8px 0;
-  border-bottom: 1px solid #eef2f8;
+  border-bottom: 1px solid #f2f4f3;
 }
 .editor-resource-choice > label:first-child,
 .editor-room-choice {
@@ -54,12 +54,12 @@
   min-width: 0;
   font-size: 11px;
   line-height: 1.6;
-  color: #627c9f;
+  color: #616c65;
 }
 .editor-resource-choice input[type="checkbox"],
 .editor-room-choice input,
 .editor-day-options input {
-  accent-color: #365bd6;
+  accent-color: #365d4c;
   flex-shrink: 0;
 }
 .editor-resource-choice > label:first-child > span,
@@ -71,7 +71,7 @@
 .editor-room-choice small {
   display: block;
   font-size: 9px;
-  color: #95a4bb;
+  color: #808d84;
 }
 .editor-resource-choice .editor-demand {
   display: flex;
@@ -79,7 +79,7 @@
   gap: 5px;
   flex-shrink: 0;
   font-size: 10px;
-  color: #8a9ab2;
+  color: #77857c;
 }
 .editor-demand > span {
   white-space: nowrap;
@@ -101,7 +101,7 @@
 .editor-resource-grid > label,
 .editor-custom-room {
   font-size: 11px;
-  color: #7a8da8;
+  color: #6e7a72;
   min-width: 0;
 }
 .editor-custom-room {
@@ -118,7 +118,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  color: #748bab;
+  color: #6c7971;
   font-size: 10px;
 }
 @media (max-width: 440px) {

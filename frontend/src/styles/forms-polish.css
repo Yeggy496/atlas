@@ -16,15 +16,15 @@
 .modal .dialog-form-fields > label {
   display: block;
   font-size: 12px;
-  color: #8191ac;
+  color: #727f76;
   margin-bottom: 16px;
   min-width: 0;
 }
 .constraint-fields-preview {
   display: block;
-  background: #f4f7fc;
+  background: #f7f9f8;
   border-radius: 7px;
-  color: #557099;
+  color: #5a645d;
   padding: 10px 12px;
   font-size: 11px;
   line-height: 1.8;

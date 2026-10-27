@@ -1,11 +1,12 @@
 import json
 import os
+from .config import env
 from datetime import datetime, timezone
 from pathlib import Path
 from sqlalchemy import create_engine, Column, String, Text
 from sqlalchemy.orm import declarative_base, Session
 
-DB_PATH=Path(os.getenv('ATLAS_DB_PATH',str(Path(__file__).resolve().parents[2]/'atlas.db'))).resolve()
+DB_PATH=Path(env('OPTIDAY_DB_PATH',str(Path(__file__).resolve().parents[2]/'optiday.db'))).resolve()
 engine=create_engine('sqlite:///'+DB_PATH.as_posix(),connect_args={'check_same_thread':False})
 Base=declarative_base()
 
@@ -16,7 +17,7 @@ def server_history_enabled():
     Public deployments have no authentication or user isolation. Their history
     belongs in each browser, so never read or store submitted problems here.
     """
-    return os.getenv('ATLAS_SERVER_HISTORY', '').strip().lower() == 'true'
+    return env('OPTIDAY_SERVER_HISTORY', '').strip().lower() == 'true'
 
 
 class SolveRun(Base):

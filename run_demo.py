@@ -25,7 +25,7 @@ def open_when_ready(url):
 
 
 def main():
-    parser=argparse.ArgumentParser(description='Run the ATLAS-Sigma demo locally.')
+    parser=argparse.ArgumentParser(description='Run OptiDay locally.')
     parser.add_argument('--port',type=int,default=8000)
     parser.add_argument('--no-browser',action='store_true')
     parser.add_argument('--check',action='store_true')
@@ -48,14 +48,14 @@ def main():
             health=json.load(response)
         with urllib.request.urlopen(url,timeout=1) as response:
             page=response.read(4096).decode('utf-8')
-        if health.get('solver')=='OR-Tools CP-SAT' and 'ATLAS' in page:
-            print('ATLAS is already running:',url,flush=True)
+        if health.get('solver')=='OR-Tools CP-SAT' and 'OptiDay' in page:
+            print('OptiDay is already running:',url,flush=True)
             if not args.no_browser:
                 webbrowser.open(url)
             return
     except (OSError,ValueError):
         pass
-    print('ATLAS-Sigma Demo:',url,flush=True)
+    print('OptiDay:',url,flush=True)
     print('Keep this window open. Press Ctrl+C to stop.',flush=True)
     if not args.no_browser:
         threading.Thread(target=open_when_ready,args=(url,),daemon=True).start()

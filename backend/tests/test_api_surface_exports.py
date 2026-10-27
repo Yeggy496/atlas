@@ -116,7 +116,7 @@ def test_export_pdf_is_a_parsable_document():
 
     reader = PdfReader(io.BytesIO(response.content))
     text = reader.pages[0].extract_text()
-    assert 'ATLAS-Sigma' in text
+    assert 'OptiDay' in text
     assert result['status'] in text
     assert len(reader.pages) >= 1
 

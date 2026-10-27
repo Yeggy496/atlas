@@ -1,6 +1,7 @@
 import { InputPanel } from "./InputPanel";
 import { ResultPanel } from "./ResultPanel";
 import { BusyStatus } from "./BusyStatus";
+import { BrandMark } from "./BrandMark";
 import { PlanChanges, type PlanBaseline } from "./PlanChanges";
 import { ResourceManager } from "./ResourceManager";
 import { useEffect, useRef, useState } from "react";
@@ -133,6 +134,7 @@ export default function App() {
   const [input, setInput] = useState(initial?.input ?? SCENARIOS[local.store.active_scenario].input),
     [provider, setProvider] = useState("demo");
   const [version, setVersion] = useState("");
+  const [modelConfigured, setModelConfigured] = useState(true);
   const [connected, setConnected] = useState(false);
   const [reviewed, setReviewed] = useState(initial?.reviewed ?? true),
     [summary, setSummary] = useState<string[]>(initial?.summary ?? []),
@@ -375,8 +377,8 @@ export default function App() {
     }
   }
   useEffect(() => {
-    api<{ provider: string; version: string }>("/health")
-      .then((x) => { setProvider(x.provider); setVersion(x.version); setConnected(true); })
+    api<{ provider: string; version: string; model_configured?: boolean }>("/health")
+      .then((x) => { setProvider(x.provider); setModelConfigured(x.model_configured !== false); setVersion(x.version); setConnected(true); })
       .catch(() => { setConnectionFailed(true); setError("暂时无法连接后端，请稍后点击重试连接。"); });
     // Weight dimensions come from the solver so the UI never hard-codes them.
     api<WeightsMeta>("/weights")
@@ -471,8 +473,8 @@ export default function App() {
   async function reconnect() {
     setConnectionFailed(false);
     try {
-      const [health, weights] = await Promise.all([api<{ provider: string; version: string }>("/health"), api<WeightsMeta>("/weights")]);
-      setProvider(health.provider); setVersion(health.version); setWeightsMeta(weights);
+      const [health, weights] = await Promise.all([api<{ provider: string; version: string; model_configured?: boolean }>("/health"), api<WeightsMeta>("/weights")]);
+      setProvider(health.provider); setModelConfigured(health.model_configured !== false); setVersion(health.version); setWeightsMeta(weights);
       setConnected(true); setWeightsFailed(false); setError("");
     } catch (e) { setConnected(false); setConnectionFailed(true); setError((e as Error).message); }
   }
@@ -645,12 +647,12 @@ export default function App() {
   }
   function backupWorkspace() {
     if (!snapshot.current) return;
-    const blob = new Blob([JSON.stringify({ format: "atlas-workspace", version: 1,
+    const blob = new Blob([JSON.stringify({ format: "optiday-workspace", version: 1,
       saved_at: new Date().toISOString(), workspace: snapshot.current }, null, 2)], { type: "application/json" });
     if (blob.size > 2_000_000) { setError("当前备份超过 2 MB。请先在输入框下方下载原文，再精简输入进行备份。原有内容仍保留。"); return; }
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url;
-    a.download = `atlas-workspace-${scenario}-${problem?.week_start}.json`; a.click();
+    a.download = `optiday-workspace-${scenario}-${problem?.week_start}.json`; a.click();
     URL.revokeObjectURL(url);
     setNotice("已下载工作空间备份，可在另一台电脑恢复。");
   }
@@ -661,7 +663,7 @@ export default function App() {
     const rows = ["name,duration_minutes,category,resources,day,start",
       ["我的新活动", "60", scenario === "academic" ? "course" : scenario === "lab" ? "experiment" : scenario === "production" ? "operation" : scenario === "meeting" ? "meeting" : "study", primary?.id ?? "", "1", "09:00"].map(csv).join(",")];
     const url = URL.createObjectURL(new Blob(["\uFEFF" + rows.join("\n")], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `atlas-${scenario}-template.csv`; anchor.click(); URL.revokeObjectURL(url);
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = `optiday-${scenario}-template.csv`; anchor.click(); URL.revokeObjectURL(url);
     setNotice("模板已包含当前资源 ID。resources 列也可填资源名称，多个资源用 | 分隔；day 为 1–7，start 留空表示灵活安排。导入会追加活动。");
   }
   async function importBackup(file: File) {
@@ -750,7 +752,7 @@ export default function App() {
       );
       const a = document.createElement("a");
       a.href = url;
-      a.download = "atlas-plan.json";
+      a.download = "optiday-plan.json";
       a.click();
       URL.revokeObjectURL(url);
       return;
@@ -786,14 +788,14 @@ export default function App() {
             setPage("workspace");
           }}
         >
-          <span className="brand-mark">Σ</span>
+          <BrandMark className="brand-mark" />
           <span>
-            ATLAS<span className="brand-sigma">–Σ</span>
+            OptiDay
             <small>智能调度与组合优化</small>
           </span>
         </a>
         <div className="workspace-label">
-          <span className="workspace-avatar">A</span>
+          <span className="workspace-avatar">O</span>
           <div>我的工作空间</div>
         </div>
         <div className="nav-label">工作空间</div>
@@ -857,7 +859,7 @@ export default function App() {
           <div className="profile">
             <span>我</span>
             <div>
-              个人工作空间<small>ATLAS-Σ{version ? ` v${version}` : ""}</small>
+              个人工作空间<small>OptiDay{version ? ` v${version}` : ""}</small>
             </div>
           </div>
         </div>
@@ -875,7 +877,9 @@ export default function App() {
               <span />
               {connected ? "CP-SAT 引擎已连接" : connectionFailed ? "服务未连接" : "正在连接服务"}
             </span>
-            <span className="provider-badge">{provider === "demo" ? "规则解析" : provider === "deepseek" ? "DeepSeek" : "OpenAI"}</span>
+            <span className="provider-badge" title={provider === "demo" ? "当前使用有限的离线规则解析；正式安排由 CP-SAT 求解。" : !modelConfigured ? "当前未配置模型。可以手工编辑任务和约束，再生成计划。" : "模型负责理解自然语言和按事实解释；正式安排由 CP-SAT 求解。"}>
+              {provider === "demo" ? "规则解析" : !modelConfigured ? "AI 未启用" : provider === "deepseek" ? "DeepSeek" : "OpenAI"}
+            </span>
             <button
               className="icon-button"
               aria-label="使用指南"
@@ -1200,7 +1204,7 @@ export default function App() {
         </div>
       </Dialog>}
       {onboarding && problem && <Dialog title="开始安排你的时间" onClose={() => setOnboarding(false)}>
-        <div className="welcome-content"><span className="welcome-mark">Σ</span><h3>把需求变成可执行的计划</h3>
+        <div className="welcome-content"><BrandMark className="welcome-mark" /><h3>把需求变成可执行的计划</h3>
           <p>添加自己的任务，或用示例看看效果。内容会保存在此浏览器，下次回来可以继续。</p>
           <div className="welcome-options"><button className="primary" disabled={!!busy} onClick={() => { setOnboarding(false); setAddingActivity(true); }}>从我的第一个任务开始<ArrowRight size={16}/></button>
             <button className="secondary" disabled={!!busy} onClick={() => { setOnboarding(false); void load(scenario, true); }}>体验完整示例</button></div>
@@ -1414,7 +1418,7 @@ export default function App() {
         </Dialog>
       )}
       {help && (
-        <Dialog title="使用 ATLAS-Σ" onClose={() => setHelp(false)}>
+        <Dialog title="使用 OptiDay" onClose={() => setHelp(false)}>
           <div className="help-content">
             <div className="form-note">
               工作内容自动保存在当前浏览器，刷新、重新打开及切换场景时会恢复上次内容。

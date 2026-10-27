@@ -1,11 +1,12 @@
 import { isLocalWorkspace, type LocalWorkspace } from "./localWorkspace";
 import { SCENARIOS, type Scenario } from "./types";
+import { LEGACY_HISTORY_KEY } from "./legacyCompatibility";
 
-const KEY = "atlas.history.v1";
+const KEY = "optiday.history.v1";
 export interface LocalRun { id: string; created_at: string; workspace: LocalWorkspace }
 export function readLocalHistory(): LocalRun[] {
   try {
-    const data: unknown = JSON.parse(localStorage.getItem(KEY) ?? "[]");
+    const data: unknown = JSON.parse(localStorage.getItem(KEY) ?? localStorage.getItem(LEGACY_HISTORY_KEY) ?? "[]");
     if (!Array.isArray(data)) return [];
     return data.filter((entry): entry is LocalRun => {
       const s = entry?.workspace?.problem?.scenario;

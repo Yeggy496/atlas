@@ -225,7 +225,7 @@ export function InputPanel({
         </p>
         {inputTooLong && <button className="clear-input-button" disabled={!!busy} onClick={() => {
           const url = URL.createObjectURL(new Blob([input], { type: "text/plain;charset=utf-8" }));
-          const link = document.createElement("a"); link.href = url; link.download = `atlas-input-${scenario}.txt`; link.click(); URL.revokeObjectURL(url);
+          const link = document.createElement("a"); link.href = url; link.download = `optiday-input-${scenario}.txt`; link.click(); URL.revokeObjectURL(url);
         }}><Download size={12}/>下载原文</button>}
       </div>
       {inputPending && <div className="pending-input" role="status">

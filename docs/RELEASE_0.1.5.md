@@ -12,7 +12,7 @@
 
 首次上线时按用户要求使用 `LLM_PROVIDER=demo`。2026-10-12 随后已在既有 Render 服务配置官方 DeepSeek，并完成实际调用验证；源码的默认配置仍为 `demo`，不包含密钥。
 
-在 Render 既有 `atlas` 服务的 Environment 中保存密钥，并设置：
+在 Render 既有 `optiday` 服务的 Environment 中保存密钥，并设置：
 
 ```text
 LLM_PROVIDER=deepseek

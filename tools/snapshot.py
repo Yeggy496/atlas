@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Version snapshots for the ATLAS-Σ demo (MASTER_SPEC §33 / §35).
+"""Version snapshots for the OptiDay demo (MASTER_SPEC §33 / §35).
 
 This project follows a *no-Git* version discipline: every meaningful change is
 captured as an immutable, self-describing snapshot under ``snapshots/`` so any
@@ -43,8 +43,8 @@ EXCLUDE_DIRS = {
 # Large or machine-specific artifacts that are reproducible and would bloat a
 # snapshot. The verified frontend build lives in the repo but is regenerated at
 # release time, so it is copied only on an explicit ``--with-dist`` run.
-EXCLUDE_FILES = {'.env', 'atlas.db'}
-EXCLUDE_SUFFIXES = {'.log', '.pid', '.tsbuildinfo'}
+EXCLUDE_FILES = {'.env', 'optiday.db'}
+EXCLUDE_SUFFIXES = {'.log', '.pid', '.tsbuildinfo', '.db', '.sqlite', '.sqlite3'}
 # Any ad-hoc scratch path (e.g. browser profiles from a verification run) never
 # belongs in a version snapshot.
 EXCLUDE_PREFIXES = ('_scratch',)
@@ -191,7 +191,7 @@ def verify(name: str) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='ATLAS-Σ 版本快照工具（无 Git 版本纪律）')
+    parser = argparse.ArgumentParser(description='OptiDay 版本快照工具（无 Git 版本纪律）')
     parser.add_argument('--label', default='', help='本次快照的说明标签')
     parser.add_argument('--bump', choices=['major', 'minor', 'patch'],
                         help='先递增 VERSION 再打快照')

@@ -1,4 +1,4 @@
-> 2026-10-12 复核说明：下文保留接力开发时的历史记录。当前功能、测试结果、部署方式和已知限制请优先阅读 [最新分析报告](docs/REVIEW_2026-10-12.md)。不要将历史“全部完成/无 Bug/已实测”表述作为当前保证。
+> 2026-10-27 更新：当前产品为 OptiDay v0.2.2。以 VERSION、README 和 [本轮发布与验证记录](docs/RELEASE_0.2.2.md) 为准；下文保留历史接力记录，不代表当前版本保证。
 
 # Project State
 
@@ -23,7 +23,7 @@ LLM 只做「理解」，CP-SAT 做「决策」，硬约束违反恒为 0；
 | --- | --- | --- |
 | 前端 | ✅ 可用 | React 18 + Vite + TypeScript；生产构建通过（`tsc -b` + `vite build` 无错）。日历 / 约束卡片 / 解释弹窗 / 权重滑块 / 对比入口 / 导出按钮组齐全 |
 | 后端 | ✅ 可用 | FastAPI；**17 个端点**，覆盖 求解 / 解析 / 诊断 / 修复 / 解释 / 对比 / 导入 / **导出** / 权重元数据 / 历史 |
-| 数据库 | ✅ 可用 | SQLAlchemy + SQLite（`atlas.db`），记录求解历史；Render 上使用 `/tmp/atlas.db` |
+| 数据库 | ✅ 可用 | SQLAlchemy + SQLite（`optiday.db`），记录求解历史；Render 上使用 `/tmp/optiday.db` |
 | 求解器 | ✅ 可用 | Google OR-Tools CP-SAT 真实求解；七项目标 + 三档偏好 + 自定义权重；独立后置校验器 |
 | LLM 层 | ✅ 可用（可降级） | `demo` 离线规则为默认；`openai` / `deepseek` 真实 Provider 可选。解释层在无真实 Provider 时回退确定性结果 |
 | 导出层 | ✅ 可用 | `POST /api/export/{xlsx,pdf}`；XLSX 含完整中文课表，PDF 为英文摘要版（取舍见 CHANGELOG） |

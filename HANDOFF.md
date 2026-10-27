@@ -1,4 +1,4 @@
-> 2026-10-14 更新：当前版本 v0.1.9。功能、验证和接力要点见 [最新发布说明](docs/RELEASE_0.1.9.md)，参赛准备见 [材料建议](docs/COMPETITION_DELIVERY.md)。下文保留接力开发时的历史记录，不应将历史“全部完成/无 Bug/已实测”表述作为当前保证。
+> 2026-10-27 更新：当前产品为 OptiDay v0.2.2。以 VERSION、README 和 [本轮发布与验证记录](docs/RELEASE_0.2.2.md) 为准；下文保留历史接力记录，不代表当前版本保证。
 
 # Handoff
 
@@ -91,7 +91,7 @@ python run_demo.py --check       # 仅检查依赖与生产构建
 ```sh
 python -m pytest backend/tests -q
 # 真实 LLM 端到端（需要 key）：
-ATLAS_LLM_LIVE_TEST=1 python -m pytest backend/tests/test_llm_live.py -q
+OPTIDAY_LLM_LIVE_TEST=1 python -m pytest backend/tests/test_llm_live.py -q
 ```
 
 ## 推荐下一步

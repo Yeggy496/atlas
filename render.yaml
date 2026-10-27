@@ -1,20 +1,20 @@
-# Render deployment configuration for the existing ATLAS service.
+# Render deployment configuration for the existing OptiDay service.
 # Commit frontend/dist together with source before deploying this small demo.
 services:
   - type: web
-    name: atlas
+    name: optiday
     runtime: python
     plan: free
     buildCommand: pip install -r backend/requirements-lock.txt && python run_demo.py --check
-    startCommand: ATLAS_SOLVE_SECONDS=30 ATLAS_SOLVER_WORKERS=1 ATLAS_DIAGNOSIS_SECONDS=2 uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+    startCommand: OPTIDAY_SOLVE_SECONDS=30 OPTIDAY_SOLVER_WORKERS=1 OPTIDAY_DIAGNOSIS_SECONDS=2 uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
     healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.14
       - key: LLM_PROVIDER
         value: demo
-      - key: ATLAS_DB_PATH
-        value: /tmp/atlas.db
+      - key: OPTIDAY_DB_PATH
+        value: /tmp/optiday.db
 
       # Keep demo until a key is saved. To enable DeepSeek, set LLM_PROVIDER=deepseek
       # and these values in the existing service's dashboard (never commit a key):

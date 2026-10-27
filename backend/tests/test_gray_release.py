@@ -83,5 +83,5 @@ def test_optional_priority_changes_the_real_solver_choice():
 
 @pytest.mark.parametrize('value,expected', [('invalid', 2), ('0', 1), ('99', 8)])
 def test_admission_setting_has_safe_bounds(monkeypatch, value, expected):
-    monkeypatch.setenv('ATLAS_TEST_LIMIT', value)
-    assert _limit('ATLAS_TEST_LIMIT') == expected
+    monkeypatch.setenv('OPTIDAY_TEST_LIMIT', value)
+    assert _limit('OPTIDAY_TEST_LIMIT') == expected

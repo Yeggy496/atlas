@@ -14,7 +14,7 @@ import time
 from playwright.sync_api import expect, sync_playwright
 
 
-WORKSPACE_KEY = 'atlas.workspace.v1'
+WORKSPACE_KEY = 'optiday.workspace.v1'
 
 
 def main():
@@ -101,11 +101,11 @@ def main():
             return context, page
 
         def stored(page):
-            return page.evaluate('JSON.parse(localStorage.getItem("atlas.workspace.v1")).workspaces.life')
+            return page.evaluate('JSON.parse(localStorage.getItem("optiday.workspace.v1")).workspaces.life')
 
         def eventually_saved(page, expression):
             page.wait_for_function('''expression => {
-                const workspace = JSON.parse(localStorage.getItem('atlas.workspace.v1'))?.workspaces.life;
+                const workspace = JSON.parse(localStorage.getItem('optiday.workspace.v1'))?.workspaces.life;
                 return !!workspace && new Function('workspace', 'return ' + expression)(workspace);
             }''', arg=expression, timeout=10000)
 
@@ -151,7 +151,7 @@ def main():
                     for page in context.pages:
                         try:
                             evidence.append({'url': page.url, 'visible_text': page.locator('body').inner_text()[:3500],
-                                             'workspace': page.evaluate('localStorage.getItem("atlas.workspace.v1")')})
+                                             'workspace': page.evaluate('localStorage.getItem("optiday.workspace.v1")')})
                         except Exception:
                             pass
                 report['checks'].append({'name': name, 'passed': False,
@@ -283,11 +283,11 @@ def main():
             b.goto(url, wait_until='networkidle')
             a.evaluate('localStorage.clear()')
             expect(b.locator('.storage-conflict-actions')).to_be_visible()
-            assert b.evaluate('localStorage.getItem("atlas.workspace.v1")') is None
+            assert b.evaluate('localStorage.getItem("optiday.workspace.v1")') is None
             expect(b.get_by_label('自然语言需求', exact=True)).to_have_value(original['input'])
             # A stale view-change autosave must also recognize a removed workspace.
             b.get_by_role('button', name='资源视图', exact=True).click()
-            assert b.evaluate('localStorage.getItem("atlas.workspace.v1")') is None
+            assert b.evaluate('localStorage.getItem("optiday.workspace.v1")') is None
             b.get_by_role('button', name='保留当前编辑', exact=True).click()
             eventually_saved(b, 'workspace.input === "另一标签清空后仍需保留的内容"')
             restored = stored(b)
@@ -349,7 +349,7 @@ def main():
             _, page = profile(workspace(result=solved_result))
             source = workspace(p=conflict_problem, result=conflict_result, text='冲突备份')
             assert source['result']['assignments'] == [] and len(source['previous']) == 1
-            import_backup(page, {'format': 'atlas-workspace', 'version': 1, 'workspace': source})
+            import_backup(page, {'format': 'optiday-workspace', 'version': 1, 'workspace': source})
             eventually_saved(page, 'workspace.result === null && workspace.previous.length === 1')
             restored = stored(page)
             assert restored['previous'] == solved_result['assignments']

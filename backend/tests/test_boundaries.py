@@ -117,7 +117,7 @@ def test_fractional_xlsx_minutes_are_not_silently_truncated():
 def test_unknown_timeout_still_returns_a_diagnosis(monkeypatch):
     """A timeout (UNKNOWN) is not proven infeasible, but /api/solve must still
     return an actionable diagnosis instead of a bare status."""
-    monkeypatch.setenv('ATLAS_DIAGNOSIS_SECONDS', '0.3')
+    monkeypatch.setenv('OPTIDAY_DIAGNOSIS_SECONDS', '0.3')
     problem = ADAPTERS['lab']()
     unknown = {
         'status': 'UNKNOWN',

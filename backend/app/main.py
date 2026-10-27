@@ -3,6 +3,7 @@ from pathlib import Path
 from uuid import uuid4
 import json
 import os
+from .config import env
 from zipfile import BadZipFile
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.responses import Response
@@ -48,13 +49,16 @@ def _read_version() -> str:
 
 APP_VERSION=_read_version()
 
-app=FastAPI(title='ATLAS-Σ',version=APP_VERSION,lifespan=lifespan)
+app=FastAPI(title='OptiDay',version=APP_VERSION,lifespan=lifespan)
 app.add_middleware(CORSMiddleware,allow_origins=['http://localhost:5173','http://127.0.0.1:5173'],allow_methods=['GET','POST'],allow_headers=['Content-Type'])
 
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','version':APP_VERSION,'solver':'OR-Tools CP-SAT','provider':os.getenv('LLM_PROVIDER','demo'),'slot_minutes':30,
+    provider = os.getenv('LLM_PROVIDER', 'demo').strip().lower()
+    configured = provider in ('deepseek', 'openai') and bool(os.getenv(f'{provider.upper()}_API_KEY', '').strip())
+    return {'status':'ok','product':'OptiDay','version':APP_VERSION,'solver':'OR-Tools CP-SAT','provider':provider,'slot_minutes':30,
+            'model_configured':configured,'parser_type':'model' if provider in ('deepseek','openai') else 'rules',
             'history_scope':'server' if server_history_enabled() else 'browser'}
 
 
@@ -167,7 +171,7 @@ def diagnose_conflicts(request:SolveRequest):
 
 
 def diagnose_admitted(request:SolveRequest):
-    probe=solve(request.problem,request.mode,seconds=float(os.getenv('ATLAS_DIAGNOSIS_SECONDS','2')),previous=request.previous,overrides=request.weights)
+    probe=solve(request.problem,request.mode,seconds=float(env('OPTIDAY_DIAGNOSIS_SECONDS','2')),previous=request.previous,overrides=request.weights)
     status=probe['status']
     if status in ('OPTIMAL','FEASIBLE'):
         return {'status':status,'infeasible':False,'conflicts':[],'repairs':[]}
@@ -205,7 +209,7 @@ def import_file(file:UploadFile=File(...),problem_json:str=Form(...)):
 def csv_template(scenario:Scenario='life'):
     resource={'life':'me','academic':'class','lab':'teamA','meeting':'room_m','production':'mill1'}[scenario]
     content=f'name,duration_minutes,day,start,resources,category\n临时会议,60,3,19:00,{resource},meeting\n数据复习,90,,,{resource},study\n'
-    return Response('\ufeff'+content,media_type='text/csv',headers={'Content-Disposition':'attachment; filename=atlas-template.csv'})
+    return Response('\ufeff'+content,media_type='text/csv',headers={'Content-Disposition':'attachment; filename=optiday-template.csv'})
 
 
 @app.post('/api/import/text')
@@ -248,7 +252,7 @@ def export_plan(fmt:str,request:ExportRequest):
             media='application/pdf'
     except (ValueError,KeyError,TypeError,AttributeError,IndexError) as exc:
         raise HTTPException(422,f'导出失败：{str(exc)[:400]}') from exc
-    name=f'atlas-{request.problem.scenario}-{request.result.get("run_id","plan")}'
+    name=f'optiday-{request.problem.scenario}-{request.result.get("run_id","plan")}'
     return Response(payload,media_type=media,headers={'Content-Disposition':f'attachment; filename={name}.{fmt}'})
 
 

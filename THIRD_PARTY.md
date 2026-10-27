@@ -15,6 +15,7 @@
 | SQLite | 本机数据库 | Public domain |
 | Google OR-Tools | CP-SAT 求解 | Apache-2.0 |
 | openpyxl | XLSX 读取 | MIT |
+| pypdf | PDF 文字提取 | BSD-3-Clause |
 | ReportLab | 中文 PDF 生成（标准 CJK 字体） | BSD-3-Clause |
 | Pillow | PDF 库依赖 | HPND / Pillow license |
 | charset-normalizer | PDF 库依赖 | MIT |

@@ -4,7 +4,7 @@
   justify-content: space-between;
   margin-top: 18px;
   font-size: 9px;
-  color: #a8b3c6;
+  color: #8c9890;
   padding-bottom: 6px;
 }
 .workspace-footer > span {
@@ -14,21 +14,21 @@
 }
 .local-save-status {
   padding-left: 8px;
-  border-left: 1px solid #d9e1ef;
+  border-left: 1px solid #e2e6e3;
 }
 .workspace-footer button {
   font-size: 10px;
-  color: #879bbf;
+  color: #7c8980;
 }
 .workspace-footer button:hover:not(:disabled) {
-  color: #365bd6;
+  color: #365d4c;
 }
 .activity-row {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 11px 6px;
-  border-bottom: 1px solid #eef1f6;
+  border-bottom: 1px solid #f1f3f2;
 }
 .activity-row > div {
   flex: 1;
@@ -36,23 +36,23 @@
 .activity-row strong {
   font-size: 11px;
   font-weight: 500;
-  color: #7686a0;
+  color: #69756d;
   display: block;
 }
 .activity-row small {
   display: block;
   font-size: 9px;
   margin-top: 4px;
-  color: #a7b1c4;
+  color: #8b978f;
 }
 .parse-summary {
   margin: 0 16px 14px;
-  background: #f4f8ff;
-  border: 1px solid #e1e9fb;
+  background: #f9faf9;
+  border: 1px solid #edefee;
   border-radius: 6px;
   padding: 10px;
   font-size: 10px;
-  color: #7d92b9;
+  color: #75837a;
 }
 .parse-summary summary {
   display: flex;
@@ -80,7 +80,7 @@
   margin-top: 6px;
 }
 .muted {
-  color: #a0aec4;
+  color: #88958c;
   font-size: 11px;
 }
 .resource-view {
@@ -89,7 +89,7 @@
 .resource-view h3 {
   font-size: 13px;
   font-weight: 550;
-  color: #6d80a2;
+  color: #66726a;
   margin-bottom: 9px;
 }
 .resource-view > p {
@@ -100,7 +100,7 @@
   align-items: center;
   gap: 14px;
   padding: 19px 0;
-  border-bottom: 1px solid #edf0f7;
+  border-bottom: 1px solid #f1f3f2;
 }
 .resource-row > div:first-child {
   width: 150px;
@@ -109,11 +109,11 @@
 .resource-row strong {
   font-size: 12px;
   font-weight: 500;
-  color: #7186aa;
+  color: #6b776f;
 }
 .resource-row small {
   font-size: 9px;
-  color: #a4b1c9;
+  color: #8c9890;
 }
 .resource-row > div > small {
   display: block;
@@ -122,14 +122,14 @@
 .resource-bar {
   flex: 1;
   height: 7px;
-  background: #f1f4fa;
+  background: #f5f6f5;
   border-radius: 10px;
   overflow: hidden;
 }
 .resource-bar > span {
   display: block;
   height: 100%;
-  background: #86a2ed;
+  background: #5a9b7a;
   border-radius: 10px;
   min-width: 2px;
 }
@@ -152,7 +152,7 @@
 }
 .bar-chart span {
   font-size: 10px;
-  color: #8297bc;
+  color: #78867d;
 }
 .bar-chart > div > div {
   height: 120px;
@@ -163,13 +163,13 @@
 }
 .bar-chart i {
   width: 100%;
-  background: #dce7fd;
-  border: 1px solid #c8d8fa;
+  background: #ebeeec;
+  border: 1px solid #dee4e0;
   border-radius: 5px 5px 0 0;
 }
 .bar-chart small {
   font-size: 10px;
-  color: #98a9c4;
+  color: #859289;
 }
 .resource-view > p:last-child {
   margin-top: 16px;
@@ -178,16 +178,16 @@
 
 .activity-row.activity-group {
   align-items: flex-start;
-  background: #fbfcff;
-  border: 1px solid #ecf0f8;
+  background: #fdfdfd;
+  border: 1px solid #f1f3f2;
   border-radius: 6px;
   padding: 10px 8px;
   margin-bottom: 6px;
-  border-bottom: 1px solid #ecf0f8;
+  border-bottom: 1px solid #f1f3f2;
 }
 .activity-row.activity-group .icon-button {
   margin-top: 1px;
 }
 .activity-group small {
-  color: #95a2ba;
+  color: #7f8d84;
 }

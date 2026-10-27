@@ -4,7 +4,7 @@ This is deliberately NOT a mocked-model test: it makes a real HTTP call to a
 configured OpenAI-compatible endpoint and asserts the full path
 APIProvider -> HTTP -> validate_parse -> Pydantic Problem validation succeeds.
 
-It only runs when ATLAS_LLM_LIVE_TEST=1 and a key is present, so the offline
+It only runs when OPTIDAY_LLM_LIVE_TEST=1 and a key is present, so the offline
 suite (and CI) stays green without credentials.
 
 Run, for example:
@@ -13,7 +13,7 @@ Run, for example:
     DEEPSEEK_API_KEY=...
     DEEPSEEK_MODEL=deepseek-flash
     DEEPSEEK_TIMEOUT=90
-    ATLAS_LLM_LIVE_TEST=1
+    OPTIDAY_LLM_LIVE_TEST=1
     python -m pytest backend/tests/test_llm_live.py -q
 """
 import os
@@ -26,8 +26,8 @@ from app.schemas import Activity, Problem, Resource
 _has_key = bool(os.getenv('OPENAI_API_KEY') or os.getenv('DEEPSEEK_API_KEY'))
 
 pytestmark = pytest.mark.skipif(
-    os.getenv('ATLAS_LLM_LIVE_TEST') != '1' or not _has_key,
-    reason='set ATLAS_LLM_LIVE_TEST=1 and an API key to run the live provider check',
+    os.getenv('OPTIDAY_LLM_LIVE_TEST') != '1' or not _has_key,
+    reason='set OPTIDAY_LLM_LIVE_TEST=1 and an API key to run the live provider check',
 )
 
 

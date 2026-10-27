@@ -23,12 +23,12 @@ def test_public_history_hides_old_rows_and_does_not_store_new_content(monkeypatc
     memory = create_engine('sqlite://', connect_args={'check_same_thread': False},
                            poolclass=StaticPool)
     monkeypatch.setattr(storage, 'engine', memory)
-    monkeypatch.setenv('ATLAS_SERVER_HISTORY', 'true')
+    monkeypatch.setenv('OPTIDAY_SERVER_HISTORY', 'true')
     storage.init_db()
     storage.save_run('old-private-run', {'name': '旧访客的私人内容'}, {'status': 'OPTIMAL'})
     assert len(storage.recent_runs()) == 1
 
-    monkeypatch.delenv('ATLAS_SERVER_HISTORY')
+    monkeypatch.delenv('OPTIDAY_SERVER_HISTORY')
     with TestClient(app) as client:
         assert client.get('/api/history').json() == []
         assert client.get('/api/health').json()['history_scope'] == 'browser'
@@ -38,7 +38,7 @@ def test_public_history_hides_old_rows_and_does_not_store_new_content(monkeypatc
         assert client.get('/api/history').json() == []
 
     # The real solve above must not have added a second database row.
-    monkeypatch.setenv('ATLAS_SERVER_HISTORY', 'true')
+    monkeypatch.setenv('OPTIDAY_SERVER_HISTORY', 'true')
     rows = storage.recent_runs()
     assert [row['id'] for row in rows] == ['old-private-run']
     memory.dispose()

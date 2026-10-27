@@ -1,7 +1,8 @@
 import { SCENARIOS, type Assignment, type Mode, type Problem, type Result, type Scenario } from "./types";
+import { LEGACY_WORKSPACE_KEY, LEGACY_BACKUP_FORMAT } from "./legacyCompatibility";
 
 // Local content only: provider credentials and server history are never stored here.
-export const LOCAL_WORKSPACE_KEY = "atlas.workspace.v1";
+export const LOCAL_WORKSPACE_KEY = "optiday.workspace.v1";
 export interface LocalWorkspace {
   problem: Problem;
   result: Result | null;
@@ -92,7 +93,8 @@ export function isLocalWorkspace(value: unknown, s: Scenario): value is LocalWor
 export function readLocalWorkspaces(): { store: WorkspaceStore; warning: string } {
   const empty: WorkspaceStore = { schema_version: 1, active_scenario: "life", workspaces: {} };
   try {
-    const raw = localStorage.getItem(LOCAL_WORKSPACE_KEY);
+    const current = localStorage.getItem(LOCAL_WORKSPACE_KEY);
+    const raw = current ?? localStorage.getItem(LEGACY_WORKSPACE_KEY);
     if (!raw) return { store: empty, warning: "" };
     const data: unknown = JSON.parse(raw);
     if (!record(data) || data.schema_version !== 1 || !scenario(data.active_scenario) || !record(data.workspaces)) {
@@ -106,7 +108,9 @@ export function readLocalWorkspaces(): { store: WorkspaceStore; warning: string 
       if (isLocalWorkspace(saved, s)) store.workspaces[s] = saved;
       else damaged = true;
     }
-    return { store, warning: damaged ? "部分本地数据无法恢复，已忽略损坏的内容。" : "" };
+    // Validate every workspace before migrating, and retain the old copy for recovery.
+    const migrationWarning = current === null ? writeLocalWorkspaces(store) : "";
+    return { store, warning: damaged ? "部分本地数据无法恢复，已忽略损坏的内容。" : migrationWarning };
   } catch {
     return { store: empty, warning: "无法读取本地保存。可导入备份，或从空白计划重新开始。" };
   }
@@ -124,11 +128,11 @@ export function readWorkspaceBackup(raw: string): LocalWorkspace {
       previousProblem: p, input: "", appliedInput: "", mode: "balanced", customWeights: null,
       reviewed: false, summary: [], warnings: [], inputTab: "activities", view: "calendar" };
   }
-  if (!record(data) || data.format !== "atlas-workspace" || data.version !== 1 ||
+  if (!record(data) || !["optiday-workspace", LEGACY_BACKUP_FORMAT].includes(String(data.format)) || data.version !== 1 ||
     !record(data.workspace) || !record(data.workspace.problem) ||
     !scenario(data.workspace.problem.scenario) ||
     !isLocalWorkspace(data.workspace, data.workspace.problem.scenario)) {
-    throw new Error("请选择由“备份工作空间”下载的 ATLAS 文件，原有内容未改变。");
+    throw new Error("请选择由“备份工作空间”下载的 OptiDay 文件，原有内容未改变。");
   }
   return data.workspace;
 }

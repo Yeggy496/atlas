@@ -3,7 +3,7 @@
     Rebuild the committed frontend bundle (frontend/dist) and stage it.
 
 .DESCRIPTION
-    The live ATLAS-Sigma demo is served from frontend/dist, which is committed to
+    The live OptiDay demo is served from frontend/dist, which is committed to
     git. Run this after any change under frontend/src (or the frontend build
     config) so the deployed bundle never goes stale. It installs from the locked
     dependency set, runs the production build, and stages the result.
@@ -37,5 +37,5 @@ finally {
     Pop-Location
 }
 
-git -C $repoRoot add frontend/dist
-Write-Host "frontend/dist rebuilt and staged. Review 'git status' and commit." -ForegroundColor Green
+git -C $repoRoot add frontend/dist backend/app/webapp
+Write-Host "Both production frontend copies rebuilt and staged. Review 'git status' and commit." -ForegroundColor Green

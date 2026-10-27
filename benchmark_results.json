@@ -1,14 +1,13 @@
 {
   "meta": {
-    "generated_at": "2026-10-09T20:34:50+08:00",
+    "generated_at": "2026-10-27T16:43:18+08:00",
     "provider": "demo",
     "seed": 0,
-    "atlas_seconds": 4.0,
+    "optiday_seconds": 5.0,
     "methods": [
       "random",
       "greedy",
-      "llm",
-      "atlas"
+      "optiday"
     ]
   },
   "rows": [
@@ -31,7 +30,7 @@
       "daily_load_span_hours": 3.5,
       "scheduled": 35,
       "required": 34,
-      "solve_time": 0.001,
+      "solve_time": 0.0,
       "method": "random",
       "note": "随机合法域，不检查冲突",
       "instance": "life",
@@ -66,54 +65,26 @@
       "constraints": 11
     },
     {
-      "hard_violations": 7,
-      "valid": false,
-      "violations_sample": [
-        "大学英语 · 周二 10:00，连续 2 小时",
-        "我的时间 容量超限",
-        "数据结构 · 周三 09:00，连续 2 小时",
-        "线性代数 · 周五 09:00，连续 2 小时",
-        "计算机实验 · 周四 14:00，连续 2 小时",
-        "高数作业 · 周三开始前完成",
-        "高等数学 · 周一 09:00，连续 2 小时"
-      ],
-      "preference_total": 1,
-      "preference_satisfied": 1,
-      "preference_score": 1.0,
-      "fragmentation_slots": 80,
-      "daily_load_span_hours": 1.5,
-      "scheduled": 35,
-      "required": 34,
-      "solve_time": 0.0,
-      "method": "llm",
-      "note": "一次性直接排程（llm-proxy(offline)）",
-      "instance": "life",
-      "scenario": "life",
-      "activities": 35,
-      "resources": 1,
-      "constraints": 11
-    },
-    {
       "hard_violations": 0,
       "valid": true,
       "violations_sample": [],
       "preference_total": 1,
       "preference_satisfied": 1,
       "preference_score": 1.0,
-      "fragmentation_slots": 43,
+      "fragmentation_slots": 46,
       "daily_load_span_hours": 1.0,
       "scheduled": 35,
       "required": 34,
-      "solve_time": 3.192,
-      "method": "atlas",
-      "note": "CP-SAT OPTIMAL",
+      "solve_time": 5.051,
+      "method": "optiday",
+      "note": "CP-SAT FEASIBLE",
       "solver": {
-        "solve_time": 3.116,
+        "solve_time": 5.002,
         "activities": 35,
         "resources": 1,
         "constraints": 11,
-        "variables": 1660,
-        "model_constraints": 563,
+        "variables": 1676,
+        "model_constraints": 577,
         "hard_violations": 0,
         "scheduled": 35,
         "scheduled_hours": 86.0,
@@ -124,13 +95,13 @@
         "daily_hours": [
           4.5,
           4.5,
+          4.0,
+          4.0,
           5.0,
-          4.0,
-          4.0,
           4.0,
           4.0
         ],
-        "status": "OPTIMAL"
+        "status": "FEASIBLE"
       },
       "instance": "life",
       "scenario": "life",
@@ -180,34 +151,9 @@
       "daily_load_span_hours": 8.0,
       "scheduled": 11,
       "required": 11,
-      "solve_time": 0.001,
+      "solve_time": 0.0,
       "method": "greedy",
       "note": "最早可排贪心，仅避让资源占用",
-      "instance": "academic",
-      "scenario": "academic",
-      "activities": 11,
-      "resources": 6,
-      "constraints": 5
-    },
-    {
-      "hard_violations": 4,
-      "valid": false,
-      "violations_sample": [
-        "张老师 容量超限",
-        "教学楼 A201 容量超限",
-        "机器学习 1 与 机器学习 2 连排",
-        "计算机 2401 班 容量超限"
-      ],
-      "preference_total": 1,
-      "preference_satisfied": 1,
-      "preference_score": 1.0,
-      "fragmentation_slots": 0,
-      "daily_load_span_hours": 6.0,
-      "scheduled": 11,
-      "required": 11,
-      "solve_time": 0.0,
-      "method": "llm",
-      "note": "一次性直接排程（llm-proxy(offline)）",
       "instance": "academic",
       "scenario": "academic",
       "activities": 11,
@@ -225,11 +171,11 @@
       "daily_load_span_hours": 6.0,
       "scheduled": 11,
       "required": 11,
-      "solve_time": 4.098,
-      "method": "atlas",
+      "solve_time": 5.034,
+      "method": "optiday",
       "note": "CP-SAT FEASIBLE",
       "solver": {
-        "solve_time": 4.048,
+        "solve_time": 5.001,
         "activities": 11,
         "resources": 6,
         "constraints": 5,
@@ -243,8 +189,8 @@
         "preference_satisfied": 1,
         "changed": 0,
         "daily_hours": [
-          4.0,
           6.0,
+          4.0,
           4.0,
           4.0,
           4.0,
@@ -306,30 +252,6 @@
       "constraints": 4
     },
     {
-      "hard_violations": 3,
-      "valid": false,
-      "violations_sample": [
-        "先完成预处理 A，再进行光谱分析 A",
-        "光谱分析 A 完成后整理数据",
-        "光谱分析 B 完成后整理数据"
-      ],
-      "preference_total": 0,
-      "preference_satisfied": 0,
-      "preference_score": 1.0,
-      "fragmentation_slots": 0,
-      "daily_load_span_hours": 2.0,
-      "scheduled": 6,
-      "required": 6,
-      "solve_time": 0.0,
-      "method": "llm",
-      "note": "一次性直接排程（llm-proxy(offline)）",
-      "instance": "lab",
-      "scenario": "lab",
-      "activities": 6,
-      "resources": 6,
-      "constraints": 4
-    },
-    {
       "hard_violations": 0,
       "valid": true,
       "violations_sample": [],
@@ -340,11 +262,11 @@
       "daily_load_span_hours": 2.0,
       "scheduled": 6,
       "required": 6,
-      "solve_time": 1.304,
-      "method": "atlas",
+      "solve_time": 0.887,
+      "method": "optiday",
       "note": "CP-SAT OPTIMAL",
       "solver": {
-        "solve_time": 1.271,
+        "solve_time": 0.866,
         "activities": 6,
         "resources": 6,
         "constraints": 4,
@@ -358,11 +280,11 @@
         "preference_satisfied": 0,
         "changed": 0,
         "daily_hours": [
-          1.0,
+          2.0,
+          2.0,
           2.0,
           1.0,
-          2.0,
-          2.0,
+          1.0,
           0.0,
           0.0
         ],
@@ -392,25 +314,16 @@
       "preference_score": 0.3333,
       "fragmentation_slots": 97,
       "daily_load_span_hours": 9.67,
-      "solve_time": 0.001
-    },
-    "llm": {
-      "instances": 3,
-      "hard_violations": 14,
-      "valid_instances": 0,
-      "preference_score": 1.0,
-      "fragmentation_slots": 80,
-      "daily_load_span_hours": 3.17,
       "solve_time": 0.0
     },
-    "atlas": {
+    "optiday": {
       "instances": 3,
       "hard_violations": 0,
       "valid_instances": 3,
       "preference_score": 1.0,
-      "fragmentation_slots": 47,
+      "fragmentation_slots": 50,
       "daily_load_span_hours": 3.0,
-      "solve_time": 2.865
+      "solve_time": 3.657
     }
   }
 }

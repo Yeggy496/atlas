@@ -124,7 +124,7 @@ with sync_playwright() as p:
     expect(page.locator('.main-content > .message.error')).to_have_count(0)
     report['checks'].append('invalid time window is rejected inline without an API call; corrected form passes real server validation')
     if not args.smoke:
-        problem = json.loads(page.evaluate('localStorage.getItem("atlas.workspace.v1")'))['workspaces']['life']['problem']
+        problem = json.loads(page.evaluate('localStorage.getItem("optiday.workspace.v1")'))['workspaces']['life']['problem']
         first_id = problem['activities'][0]['id']
         for ctype in ['precedence', 'fixed_time', 'deadline']:
             page.get_by_role('button', name='添加约束', exact=True).click()
@@ -177,9 +177,9 @@ with sync_playwright() as p:
             # A real API solve is stored in this browser, rather than relying on
             # the formerly public/shared server history.
             page.evaluate('''({problem, result}) => {
-                const workspace = {...JSON.parse(localStorage.getItem('atlas.workspace.v1')).workspaces.life,
+                const workspace = {...JSON.parse(localStorage.getItem('optiday.workspace.v1')).workspaces.life,
                     problem, result, previous: result.assignments, reviewed: true};
-                localStorage.setItem('atlas.history.v1', JSON.stringify([{id: result.run_id,
+                localStorage.setItem('optiday.history.v1', JSON.stringify([{id: result.run_id,
                     created_at: new Date().toISOString(), workspace}]));
             }''', {'problem': problem, 'result': result})
             page.get_by_role('button', name='求解历史', exact=True).click()

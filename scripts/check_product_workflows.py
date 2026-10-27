@@ -41,7 +41,7 @@ with sync_playwright() as p:
 
     page.goto(url, wait_until='networkidle', timeout=180000)
     expect(page.get_by_role('dialog', name='开始安排你的时间', exact=True)).to_be_visible()
-    assert page.evaluate("JSON.parse(localStorage.getItem('atlas.workspace.v1')).workspaces.life.problem.activities.length") == 0
+    assert page.evaluate("JSON.parse(localStorage.getItem('optiday.workspace.v1')).workspaces.life.problem.activities.length") == 0
     initial = solved(lambda: page.get_by_role('button', name='体验完整示例', exact=True).click())
     report['checks'].append('a new browser starts blank and loads a full example only after explicit selection')
     assert page.request.get(url + '/api/history').json() == []
@@ -55,7 +55,7 @@ with sync_playwright() as p:
     backup = pending.value
     backup_bytes = Path(backup.path()).read_bytes()
     data = json.loads(backup_bytes)
-    assert data['format'] == 'atlas-workspace' and len(data['workspace']['problem']['activities']) == 35
+    assert data['format'] == 'optiday-workspace' and len(data['workspace']['problem']['activities']) == 35
     page.get_by_role('button', name='新建自己的计划', exact=True).click()
     page.get_by_role('dialog').get_by_role('button', name='取消', exact=True).click()
     expect(page.locator('.calendar-event')).to_have_count(28)
@@ -63,7 +63,7 @@ with sync_playwright() as p:
     page.get_by_role('dialog').get_by_role('button', name='确认新建', exact=True).click()
     expect(page.locator('textarea')).to_have_value('')
     expect(page.locator('.optimize-button')).to_be_disabled()
-    assert page.evaluate("JSON.parse(localStorage.getItem('atlas.workspace.v1')).workspaces.life.problem.activities.length") == 0
+    assert page.evaluate("JSON.parse(localStorage.getItem('optiday.workspace.v1')).workspaces.life.problem.activities.length") == 0
     page.get_by_role('button', name='撤销修改', exact=True).click()
     expect(page.locator('.calendar-event')).to_have_count(28)
     report['checks'].append('destructive replacement can be cancelled or undone without losing the original plan')
@@ -104,15 +104,15 @@ with sync_playwright() as p:
     report['checks'].append('resource changes are validated, require review, and cannot delete an in-use resource')
 
     page.get_by_role('button', name='智能排课', exact=True).click()
-    page.wait_for_function("JSON.parse(localStorage.getItem('atlas.workspace.v1'))?.workspaces.academic?.problem.activities.length === 0")
+    page.wait_for_function("JSON.parse(localStorage.getItem('optiday.workspace.v1'))?.workspaces.academic?.problem.activities.length === 0")
     expect(page.locator('textarea')).to_have_value('')
-    assert page.evaluate("JSON.parse(localStorage.getItem('atlas.workspace.v1')).workspaces.academic.problem.activities.length") == 0
+    assert page.evaluate("JSON.parse(localStorage.getItem('optiday.workspace.v1')).workspaces.academic.problem.activities.length") == 0
     page.locator('textarea').fill('原来的排课草稿需要保留')
     page.get_by_role('button', name='个人周计划', exact=True).click()
     academic = page.request.get(url + '/api/templates/academic').json()
     cross = {**data['workspace'], 'problem': academic, 'result': None, 'previous': [],
              'previousProblem': academic, 'input': '备份中的排课输入', 'reviewed': False}
-    cross_bytes = json.dumps({'format': 'atlas-workspace', 'version': 1, 'workspace': cross}).encode()
+    cross_bytes = json.dumps({'format': 'optiday-workspace', 'version': 1, 'workspace': cross}).encode()
     page.locator('input[aria-label="选择工作空间备份"]').set_input_files(
         {'name': 'cross.json', 'mimeType': 'application/json', 'buffer': cross_bytes})
     page.get_by_role('dialog').get_by_role('button', name='确认恢复', exact=True).click()
@@ -138,27 +138,27 @@ with sync_playwright() as p:
     # Cross-device backup import: full data survives, untrusted solved claims do not bypass review.
     second.get_by_role('button', name='调度工作台', exact=True).click()
     second.locator('input[aria-label="选择工作空间备份"]').set_input_files(
-        {'name': 'atlas-workspace.json', 'mimeType': 'application/json', 'buffer': backup_bytes})
+        {'name': 'optiday-workspace.json', 'mimeType': 'application/json', 'buffer': backup_bytes})
     second.get_by_role('dialog', name='恢复工作空间备份？', exact=True).get_by_role('button', name='确认恢复', exact=True).click()
     expect(second.locator('.review-check input')).not_to_be_checked()
     expect(second.locator('.optimize-button')).to_be_disabled()
-    restored = second.evaluate("JSON.parse(localStorage.getItem('atlas.workspace.v1')).workspaces.life")
+    restored = second.evaluate("JSON.parse(localStorage.getItem('optiday.workspace.v1')).workspaces.life")
     assert len(restored['problem']['activities']) == 35 and restored['result'] is None
     second.reload(wait_until='networkidle')
     expect(second.locator('.review-check input')).not_to_be_checked()
     report['checks'].append('backup restores tasks on another browser and survives reload without accepting imported solver results')
-    before = second.evaluate("localStorage.getItem('atlas.workspace.v1')")
+    before = second.evaluate("localStorage.getItem('optiday.workspace.v1')")
     second.locator('input[aria-label="选择工作空间备份"]').set_input_files(
         {'name': 'invalid.json', 'mimeType': 'application/json', 'buffer': b'{invalid'})
     expect(second.locator('.message.error').first).to_contain_text('有效的 JSON')
-    assert second.evaluate("localStorage.getItem('atlas.workspace.v1')") == before
+    assert second.evaluate("localStorage.getItem('optiday.workspace.v1')") == before
     report['checks'].append('invalid backup is rejected without modifying existing browser content')
     other.close()
 
     blocked = browser.new_context()
     blocked.add_init_script('''const set = Storage.prototype.setItem;
       Storage.prototype.setItem = function(key, value) {
-        if (key === 'atlas.history.v1') throw new DOMException('history quota', 'QuotaExceededError');
+        if (key === 'optiday.history.v1') throw new DOMException('history quota', 'QuotaExceededError');
         return set.call(this, key, value);
       };''')
     warning_page = blocked.new_page()

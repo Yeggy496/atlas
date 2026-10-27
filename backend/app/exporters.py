@@ -253,10 +253,10 @@ def build_pdf(problem: Problem, result: dict) -> bytes:
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=32, leftMargin=32,
                             topMargin=32, bottomMargin=38,
-                            title=f'ATLAS-Sigma - {problem.name}', author='ATLAS-Sigma',
+                            title=f'OptiDay - {problem.name}', author='OptiDay',
                             # Repeated downloads of the same data are byte stable.
                             invariant=1)
-    story = [para('ATLAS-Sigma 周计划', heading_style), Spacer(1, 6),
+    story = [para('OptiDay 周计划', heading_style), Spacer(1, 6),
              para(problem.name),
              para(f'起始日期：{problem.week_start}　时间粒度：30 分钟', small_style),
              Spacer(1, 14)]
@@ -308,7 +308,7 @@ def build_pdf(problem: Problem, result: dict) -> bytes:
         canvas.saveState()
         canvas.setFont(font, 8)
         canvas.setFillColor(muted)
-        canvas.drawString(32, 21, 'ATLAS-Sigma')
+        canvas.drawString(32, 21, 'OptiDay')
         canvas.drawRightString(A4[0] - 32, 21, f'第 {document.page} 页')
         canvas.restoreState()
 

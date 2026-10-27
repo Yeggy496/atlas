@@ -1,4 +1,4 @@
-# ATLAS-Σ
+# OptiDay
 
 Website: https://atlas-ptbu.onrender.com
 
@@ -6,7 +6,9 @@ A small scheduling application for personal weekly planning, one-class academic 
 laboratory resources, meeting rooms, and production jobs.
 All five scenarios share a validated constraint model and a real OR-Tools CP-SAT solver.
 
-Current version: v0.2.1 improves gray-test readiness: safe text imports, visible filters, optional priorities, meeting-room allocation, failed-save recovery, and bounded expensive requests. [Release notes](docs/RELEASE_0.2.1.md).
+Current version: **v0.2.2 — OptiDay**. A quieter white, graphite and forest palette, an original clock symbol,
+readable category colors, compatible browser-data upgrades, and automatic synchronization of both frontend bundles.
+The validated v0.2.1 scheduling workflows are retained. [Release notes and verification](docs/RELEASE_0.2.2.md).
 Product workflow notes: [v0.1.9](docs/RELEASE_0.1.9.md).
 Local workspace notes: [v0.1.7](docs/RELEASE_0.1.7.md).
 Product interface notes: [v0.1.6](docs/RELEASE_0.1.6.md).
@@ -47,7 +49,7 @@ git config core.hooksPath .githooks
 
 `render.yaml` defines one free native Python web service. The service uses the platform-provided HTTPS domain.
 Build: `pip install -r backend/requirements-lock.txt && python run_demo.py --check`
-Start: `ATLAS_SOLVE_SECONDS=30 ATLAS_SOLVER_WORKERS=1 ATLAS_DIAGNOSIS_SECONDS=2 uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT`
+Start: `OPTIDAY_SOLVE_SECONDS=30 OPTIDAY_SOLVER_WORKERS=1 OPTIDAY_DIAGNOSIS_SECONDS=2 uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT`
 Health check: `/api/health`.
 
 ## Features and boundaries
@@ -63,7 +65,7 @@ Health check: `/api/health`.
 - View a week, one day, or an agenda. Mobile defaults to the agenda, offers history navigation, and scrolls to the generated plan. Early/late activities cannot be silently hidden.
 - CSV/XLSX accepts Chinese headers, current resource IDs or unambiguous names, and native spreadsheet time cells. Imports append activities and disclose potential duplicates. TXT/PDF preserves the extracted text up to 200,000 characters; the user parses it in chunks of up to 4,000 characters without losing the remaining text.
 - Event details retrieve deterministic solver facts first. AI narration is requested explicitly and cached in the current session; opening an event does not automatically incur a model call.
-- The last 12 solve runs stay in the current browser. Public deployments neither expose nor persist shared visitor histories by default; `/api/history` returns an empty list. `ATLAS_SERVER_HISTORY=true` is only for a trusted single-user local service.
+- The last 12 solve runs stay in the current browser. Public deployments neither expose nor persist shared visitor histories by default; `/api/history` returns an empty list. `OPTIDAY_SERVER_HISTORY=true` is only for a trusted single-user local service.
 - Chinese PDF and Excel exports use the real on-screen assignments; rescheduling displays changes from the previous plan.
 - Default `LLM_PROVIDER=demo` is a limited offline rule parser, clearly identified in the UI.
 - OpenAI and DeepSeek provider implementations accept server-only environment variables; real API calls require configuration and verification.
@@ -86,7 +88,7 @@ The real providers call an OpenAI-compatible `/chat/completions` endpoint and re
 | `OPENAI_TIMEOUT` / `DEEPSEEK_TIMEOUT` | per-request seconds (defaults `35` / `90`) |
 
 `backend/tests/test_llm_live.py` performs a real end-to-end provider call. It is skipped unless
-`ATLAS_LLM_LIVE_TEST=1` and a key are set, so the offline suite and CI stay green without credentials.
+`OPTIDAY_LLM_LIVE_TEST=1` and a key are set, so the offline suite and CI stay green without credentials.
 
 ### Turning on a real provider on Render
 
@@ -116,6 +118,21 @@ Model gateways must be reachable from the hosting server; test them before use.
 
 Start the application, then run `python scripts/check_gray_workflows.py --url http://127.0.0.1:8000` for focused real-browser checks. The other `scripts/check_*workflows.py` checks cover complete resource, backup, repair, and persistence journeys. These tests use isolated browser data. Network and quota failures are simulated deliberately; valid schedules are produced by CP-SAT.
 
-The single-process server bounds concurrent solves/diagnosis to 2 and model requests to 2 by default (`ATLAS_CONCURRENT_SOLVES` / `ATLAS_CONCURRENT_MODEL_CALLS`, supported range 1–8). Requests above capacity receive HTTP 429 with `Retry-After: 3`; the UI preserves current content and offers retry. This protects a small instance; it is not a throughput benchmark or a distributed queue.
+The single-process server bounds concurrent solves/diagnosis to 2 and model requests to 2 by default (`OPTIDAY_CONCURRENT_SOLVES` / `OPTIDAY_CONCURRENT_MODEL_CALLS`, supported range 1–8). Requests above capacity receive HTTP 429 with `Retry-After: 3`; the UI preserves current content and offers retry. This protects a small instance; it is not a throughput benchmark or a distributed queue.
+
+## Upgrading an existing installation
+
+Existing browser plans, solve history and downloaded backups are accepted by OptiDay. Validated plans are copied
+to the new browser storage key; the original copy is kept for recovery. A newly created OptiDay backup uses
+the new product name. Public server history remains disabled by default.
+
+Use `OPTIDAY_*` for new server settings. Existing settings with the previous product prefix remain supported by
+`backend/app/config.py`; an explicit new value wins. Provider keys such as `DEEPSEEK_API_KEY` do not change.
+The repository and hosted service retain their existing addresses so shared links continue working.
+
+`pnpm build` now updates both `frontend/dist` and `backend/app/webapp`. Commit both generated folders with
+frontend changes. `python scripts/check_brand_upgrade.py --url http://127.0.0.1:8000` verifies old-data recovery,
+the new identity, and export metadata. Fresh three-scenario benchmark results are in `docs/evidence-20261027/`;
+they compare simple baselines and CP-SAT on preset data, not model accuracy or real user outcomes.
 
 See `THIRD_PARTY.md` for dependencies and upstream references. Credentials, local databases, private requirements documents, and runtime logs are excluded from this repository.

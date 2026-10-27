@@ -1,5 +1,5 @@
 #!/bin/sh
-# ATLAS-Sigma pre-commit guard (A4).
+# OptiDay pre-commit guard.
 #
 # The deployed bundle in frontend/dist is committed and served by FastAPI, so a
 # frontend source change that is committed without rebuilding ships a stale UI.
@@ -15,15 +15,16 @@ staged=$(git diff --cached --name-only --diff-filter=ACMR)
 
 source_changed=$(printf '%s\n' "$staged" | grep -E '^frontend/(src/|public/|index\.html$|vite\.config\.|tsconfig.*\.json$|package\.json$|pnpm-lock\.yaml$|pnpm-workspace\.yaml$|\.npmrc$|tailwind\.config\.|postcss\.config\.)' || true)
 dist_changed=$(printf '%s\n' "$staged" | grep -E '^frontend/dist/' || true)
+fallback_changed=$(printf '%s\n' "$staged" | grep -E '^backend/app/webapp/' || true)
 
-if [ -n "$source_changed" ] && [ -z "$dist_changed" ]; then
+if [ -n "$source_changed" ] && { [ -z "$dist_changed" ] || [ -z "$fallback_changed" ]; }; then
     echo ""
-    echo "  pre-commit: frontend sources are staged but frontend/dist is not." >&2
+    echo "  pre-commit: frontend sources need both rebuilt production bundles." >&2
     echo "" >&2
     echo "  The committed bundle is what the live demo serves, so rebuild first:" >&2
     echo "" >&2
     echo "      scripts/build_frontend.ps1     # or: cd frontend && pnpm build" >&2
-    echo "      git add frontend/dist          # then commit again" >&2
+    echo "      git add frontend/dist backend/app/webapp   # then commit again" >&2
     echo "" >&2
     echo "  Staged frontend files:" >&2
     printf '      %s\n' $source_changed >&2

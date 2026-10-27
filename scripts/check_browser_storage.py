@@ -18,7 +18,7 @@ parser.add_argument('--report')
 parser.add_argument('--screenshot')
 args = parser.parse_args()
 url = args.url.rstrip('/')
-key = 'atlas.workspace.v1'
+key = 'optiday.workspace.v1'
 draft_text = '我的本地草稿：周三19:00有一个会议，文字还没有提交识别。'
 task_name = '本地保存测试会议'
 expected_version = (Path(__file__).resolve().parent.parent / 'VERSION').read_text(encoding='utf-8').strip()
@@ -66,7 +66,7 @@ def reload_saved(page, requests, expected_text, pending=False):
         expect(page.get_by_role('checkbox', name='我已检查并确认当前任务与约束')).not_to_be_checked()
         expect(page.locator('.optimize-button')).to_be_disabled()
 
-with tempfile.TemporaryDirectory(prefix='atlas-browser-storage-') as temp, sync_playwright() as p:
+with tempfile.TemporaryDirectory(prefix='optiday-browser-storage-') as temp, sync_playwright() as p:
     profile = str(Path(temp) / 'primary')
     context = p.chromium.launch_persistent_context(profile, **launch)
     page, requests = fresh(context)

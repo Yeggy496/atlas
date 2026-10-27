@@ -34,7 +34,7 @@ DEFAULT_BASE = {'openai': 'https://api.openai.com/v1', 'deepseek': 'https://api.
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='Check the configured ATLAS-Sigma LLM provider.')
+    parser = argparse.ArgumentParser(description='Check the configured OptiDay LLM provider.')
     parser.add_argument('--scenario', choices=sorted(REQUESTS), default='life')
     args = parser.parse_args()
 

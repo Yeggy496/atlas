@@ -3,11 +3,11 @@
     "generated_at": "2026-10-14T08:24:02+08:00",
     "provider": "demo",
     "seed": 0,
-    "atlas_seconds": 4.0,
+    "optiday_seconds": 4.0,
     "methods": [
       "random",
       "greedy",
-      "atlas"
+      "optiday"
     ]
   },
   "rows": [
@@ -76,7 +76,7 @@
       "scheduled": 35,
       "required": 34,
       "solve_time": 4.05,
-      "method": "atlas",
+      "method": "optiday",
       "note": "CP-SAT FEASIBLE",
       "solver": {
         "solve_time": 4.002,
@@ -172,7 +172,7 @@
       "scheduled": 11,
       "required": 11,
       "solve_time": 4.034,
-      "method": "atlas",
+      "method": "optiday",
       "note": "CP-SAT FEASIBLE",
       "solver": {
         "solve_time": 4.001,
@@ -263,7 +263,7 @@
       "scheduled": 6,
       "required": 6,
       "solve_time": 0.932,
-      "method": "atlas",
+      "method": "optiday",
       "note": "CP-SAT OPTIMAL",
       "solver": {
         "solve_time": 0.91,
@@ -316,7 +316,7 @@
       "daily_load_span_hours": 9.67,
       "solve_time": 0.0
     },
-    "atlas": {
+    "optiday": {
       "instances": 3,
       "hard_violations": 0,
       "valid_instances": 3,

@@ -1,8 +1,8 @@
-"""Reproducible comparison harness for the ATLAS-Sigma competition evidence.
+"""Reproducible comparison harness for the OptiDay competition evidence.
 
 Implements the project's own test system (spec sections 36-37 and TABLE 4): the
 same instances are handled by a random baseline, a simple greedy baseline, an
-optional Direct-LLM baseline, and the ATLAS-Sigma CP-SAT core. Every published
+optional Direct-LLM baseline, and the OptiDay CP-SAT core. Every published
 number comes from a real run of this repository's code; nothing is hard-coded.
 
     python scripts/benchmark.py
@@ -41,7 +41,7 @@ from app.solver.engine import preference_summary, solve  # noqa: E402
 from app.solver.validator import verify  # noqa: E402
 
 SCENARIOS = ('life', 'academic', 'lab')
-METHODS = ('random', 'greedy', 'llm', 'atlas')
+METHODS = ('random', 'greedy', 'llm', 'optiday')
 REAL_PROVIDERS = ('openai', 'deepseek')
 
 
@@ -236,7 +236,7 @@ def shipped_instances():
 # --------------------------------------------------------------------------- #
 # driver
 # --------------------------------------------------------------------------- #
-def run_method(method: str, problem: Problem, seed: int, provider_name: str, atlas_seconds):
+def run_method(method: str, problem: Problem, seed: int, provider_name: str, optiday_seconds):
     started = time.perf_counter()
     if method == 'random':
         assignments, note = random_schedule(problem, seed), '随机合法域，不检查冲突'
@@ -245,28 +245,28 @@ def run_method(method: str, problem: Problem, seed: int, provider_name: str, atl
     elif method == 'llm':
         assignments, label = llm_schedule(problem, provider_name)
         note = f'一次性直接排程（{label}）'
-    elif method == 'atlas':
-        result = solve(problem, 'balanced', seconds=atlas_seconds)
+    elif method == 'optiday':
+        result = solve(problem, 'balanced', seconds=optiday_seconds)
         assignments = _as_assignments(result['assignments'])
         note = f"CP-SAT {result['status']}"
-        atlas_metrics = dict(result['metrics'])
-        atlas_metrics['status'] = result['status']
+        optiday_metrics = dict(result['metrics'])
+        optiday_metrics['status'] = result['status']
     else:
         raise ValueError(f'未知方法 {method}')
     seconds = time.perf_counter() - started
     metrics = compute_metrics(problem, assignments, seconds)
     metrics['method'] = method
     metrics['note'] = note
-    if method == 'atlas':
-        metrics['solver'] = locals().get('atlas_metrics', {})
+    if method == 'optiday':
+        metrics['solver'] = locals().get('optiday_metrics', {})
     return metrics
 
 
-def run_benchmark(instances, methods, seed: int, provider_name: str, atlas_seconds):
+def run_benchmark(instances, methods, seed: int, provider_name: str, optiday_seconds):
     rows = []
     for name, problem in instances:
         for method in methods:
-            row = run_method(method, problem, seed, provider_name, atlas_seconds)
+            row = run_method(method, problem, seed, provider_name, optiday_seconds)
             row['instance'] = name
             row['scenario'] = problem.scenario
             row['activities'] = len(problem.activities)
@@ -322,7 +322,7 @@ def render_markdown(rows, summary, meta):
         [[r['instance'], r['activities'], r.get('solver', {}).get('variables', ''),
           r.get('solver', {}).get('model_constraints', ''), r.get('solver', {}).get('status', ''),
           f"{r['solve_time']:.3f}", r['hard_violations'], '是' if r['valid'] else '否']
-         for r in rows if r['method'] == 'atlas'])
+         for r in rows if r['method'] == 'optiday'])
     table4 = _md_table(
         ['Method', 'Hard Violations', 'Preference Score', 'Valid'],
         [[m, s['hard_violations'], f"{s['preference_score']:.2f}",
@@ -331,9 +331,9 @@ def render_markdown(rows, summary, meta):
     model_line = (f"LLM provider：{meta['provider']} {provider_note}" if 'llm' in meta['methods']
                   else '本轮仅比较调度方法，未进行大模型效果对比。')
     parts = [
-        '# ATLAS-Σ 对比实验结果',
+        '# OptiDay 对比实验结果',
         '',
-        f"生成时间：{meta['generated_at']}　求解器种子：{meta['seed']}　ATLAS 时限：{meta['atlas_seconds']}s",
+        f"生成时间：{meta['generated_at']}　求解器种子：{meta['seed']}　OptiDay 时限：{meta['optiday_seconds']}s",
         model_line,
         '',
         '## 1. 汇总（预置场景实例）',
@@ -348,22 +348,22 @@ def render_markdown(rows, summary, meta):
         '',
         table4,
         '',
-        '## 4. 求解规模与耗时（ATLAS-Σ，预置场景实例）',
+        '## 4. 求解规模与耗时（OptiDay，预置场景实例）',
         '',
         efficiency,
         '',
-        '> 所有数字均由 scripts/benchmark.py 真实运行得到；ATLAS-Σ 一列通过独立校验器 verify() 复核，硬约束违反必须为 0。',
+        '> 所有数字均由 scripts/benchmark.py 真实运行得到；OptiDay 一列通过独立校验器 verify() 复核，硬约束违反必须为 0。',
         '> 数据为预置任务，不是真实用户试点。random 不检查跨活动约束；greedy 是简化的最早可行时段法，未实现前置关系、每日上限与偏好。该对比只说明这些实例需要完整约束检查，不代表超越成熟调度算法，也不证明规模泛化。',
     ]
     return '\n'.join(parts) + '\n'
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description='ATLAS-Sigma comparison benchmark.')
+    parser = argparse.ArgumentParser(description='OptiDay comparison benchmark.')
     parser.add_argument('--scenario', nargs='+', choices=SCENARIOS, default=list(SCENARIOS))
     parser.add_argument('--methods', nargs='+', choices=METHODS, default=list(METHODS))
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--atlas-seconds', type=float, default=float(os.getenv('ATLAS_SOLVE_SECONDS', '4')))
+    parser.add_argument('--optiday-seconds', type=float, default=float(os.getenv('OPTIDAY_SOLVE_SECONDS', '4')))
     parser.add_argument('--out-dir', type=Path, default=ROOT)
     args = parser.parse_args()
 
@@ -371,14 +371,14 @@ def main() -> int:
     instances = [(n, ADAPTERS[n]()) for n in args.scenario]
 
     print(f'provider={provider_name}  methods={",".join(args.methods)}  instances={len(instances)}')
-    rows = run_benchmark(instances, args.methods, args.seed, provider_name, args.atlas_seconds)
+    rows = run_benchmark(instances, args.methods, args.seed, provider_name, args.optiday_seconds)
 
     summary = aggregate(rows, args.scenario)
     meta = {
         'generated_at': datetime.now(timezone.utc).astimezone().isoformat(timespec='seconds'),
         'provider': provider_name,
         'seed': args.seed,
-        'atlas_seconds': args.atlas_seconds,
+        'optiday_seconds': args.optiday_seconds,
         'methods': args.methods,
     }
     markdown = render_markdown(rows, summary, meta)
