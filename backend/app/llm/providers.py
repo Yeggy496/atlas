@@ -8,7 +8,7 @@ from uuid import uuid4
 from typing import Protocol
 import httpx
 from .model_http import model_client
-from .parse_support import completion_content, parse_prompt, parse_token_limit, repair_feedback, IncompleteParse, ProviderStopped
+from .parse_support import completion_content, parse_problem_payload, parse_prompt, parse_token_limit, repair_feedback, IncompleteParse, ProviderStopped
 from pydantic import BaseModel, Field, StrictStr
 from ..schemas import Problem, Activity, Constraint
 
@@ -66,7 +66,7 @@ class APIProvider:
         model = os.getenv(f'{prefix}_MODEL','gpt-4.1-mini' if self.provider=='openai' else 'deepseek-flash')
         timeout = float(os.getenv(f'{prefix}_TIMEOUT', '90' if self.provider == 'deepseek' else '35'))
         messages = [{'role': 'system', 'content': parse_prompt(problem)}, {'role': 'user', 'content':
-            json.dumps({'current_problem': problem.model_dump(exclude_defaults=True), 'request': text}, ensure_ascii=False, separators=(',', ':'))}]
+            json.dumps({'current_problem': parse_problem_payload(problem), 'request': text}, ensure_ascii=False, separators=(',', ':'))}]
         deadline = monotonic() + timeout
         token_limit = parse_token_limit(self.provider)
         try:

@@ -38,6 +38,17 @@ def completion_content(envelope):
     return fenced.group(1) if fenced else content
 
 
+def parse_problem_payload(problem: Problem):
+    # Keep scope and empty collections explicit. exclude_defaults at the root
+    # otherwise drops the selected week and makes "no constraints" ambiguous.
+    return {
+        'scenario': problem.scenario, 'name': problem.name, 'week_start': problem.week_start,
+        'resources': [r.model_dump(exclude_defaults=True) for r in problem.resources],
+        'activities': [a.model_dump(exclude_defaults=True) for a in problem.activities],
+        'constraints': [c.model_dump(exclude_defaults=True) for c in problem.constraints],
+    }
+
+
 def parse_prompt(problem: Problem):
     example = {'problem': {'scenario': problem.scenario, 'name': problem.name,
         'week_start': problem.week_start, 'resources': [r.model_dump(exclude_defaults=True) for r in problem.resources],
@@ -47,6 +58,8 @@ def parse_prompt(problem: Problem):
         'problem 是完整修改后的问题，summary/warnings 均为字符串数组。不要输出正式安排、代码或表达式。'
         '严格保持 current_problem.scenario 和 week_start；不擅自切换场景或更改所在周。'
         '保留未被用户要求修改的内容；用户明确要求重新整理或替换示例时，可按其要求删除旧活动和关联约束。'
+        '重复描述已有任务时，应复用或更新相应任务及约束，不得重复追加。'
+        '每天/每周N次或总共N小时表示修改后该项目的完整数量，不是给旧数量再增加N次或N小时；其余无关任务仍保留。'
         '用户明确提出的新课程、会议、学习等应建立为任务；未知人员和设备不可凭空增加，歧义写 warnings。'
         '每个时间槽为30分钟：半小时=1，1小时=2，8小时=16。每天/多次任务须展开为独立实例，id必须唯一。'
         '每天的days为0至6（周一=0），活动window_start/window_end为当天时刻，范围0至48。'
@@ -58,6 +71,7 @@ def parse_prompt(problem: Problem):
         '每条约束target必须是实际任务id、资源id、已使用的category或*，不能用中文活动名代替id。'
         '要在不同天安排同一项目，可使用该项目专属category并添加type=daily_limit,value=1；'
         '例如Python任务都用category=python_study，对python_study设置每日上限1，不能用通用study类别限制所有学习项目。'
+        '分成N次不等于分在N天；仅当用户明确要求不同天时才增加每日一次限制，不擅自添加硬约束。'
         '有先后顺序的工作须拆为独立任务并添加前置约束；用户要求连续2小时，应是一项duration=4的任务。'
         'precedence/min_gap/consecutive的target与other都必须是实际任务id；不要用group来表达普通重复任务，group专用于有序工序。'
         '省略未改变的默认字段，避免给每个任务反复输出全部默认属性，但不得省略用户要求或输出省略号。'

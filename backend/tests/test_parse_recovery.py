@@ -23,6 +23,21 @@ def parsed_problem():
     return {'problem': ADAPTERS['life']().model_dump(), 'summary': ['完整识别'], 'warnings': []}
 
 
+@pytest.mark.parametrize('week_start', ['2026-10-12', '2026-10-26'])
+def test_compact_request_always_contains_workspace_scope_and_empty_collections(monkeypatch, week_start):
+    monkeypatch.setenv('DEEPSEEK_API_KEY', 'TEST_ONLY_PLACEHOLDER')
+    problem = ADAPTERS['life']().model_copy(update={'week_start': week_start, 'activities': [], 'constraints': []})
+    expected = {'problem': problem.model_dump(), 'summary': [], 'warnings': []}
+    with patch('app.llm.providers.httpx.Client.post', return_value=envelope(expected)) as post:
+        APIProvider('deepseek').parse_constraints(problem, '创建我的周计划')
+    payload = json.loads(post.call_args.kwargs['json']['messages'][1]['content'])['current_problem']
+    assert payload['week_start'] == week_start
+    assert payload['scenario'] == 'life'
+    assert payload['name'] == problem.name
+    assert payload['activities'] == [] and payload['constraints'] == []
+    assert payload['resources'][0]['id'] == problem.resources[0].id
+
+
 def test_truncated_response_is_regenerated_even_if_its_json_is_balanced(monkeypatch):
     monkeypatch.setenv('DEEPSEEK_API_KEY', 'TEST_ONLY_PLACEHOLDER')
     monkeypatch.delenv('DEEPSEEK_MAX_TOKENS', raising=False)
