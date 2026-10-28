@@ -418,11 +418,15 @@ def main():
 
             context.route('**/api/constraints/parse', parser_response)
             page.get_by_role('button', name='识别下一段', exact=True).click()
+            scope_dialog = page.get_by_role('dialog', name='如何处理已有任务？')
+            expect(scope_dialog).to_contain_text('本次识别前 4,000 字')
+            scope_dialog.get_by_role('button', name='保留现有任务并识别').click()
             expect(page.locator('.busy-status')).to_have_count(0)
             remainder = page.get_by_label('自然语言需求', exact=True).input_value()
             assert captured == [text[:4000]] and remainder == text[4000:]
             expect(page.locator('.optimize-button')).to_be_disabled()
             page.get_by_role('button', name='识别约束', exact=True).click()
+            page.get_by_role('dialog', name='如何处理已有任务？').get_by_role('button', name='保留现有任务并识别').click()
             expect(page.locator('.busy-status')).to_have_count(0)
             assert ''.join(captured) == text and len(captured) == 2
             assert captured[-1].endswith('末尾重要条件：周日18:00以前交作业。')

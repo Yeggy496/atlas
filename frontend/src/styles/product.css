@@ -27,7 +27,7 @@
 .plan-changes small { margin-left: 8px; color: #717e75; }
 .start-plan-note { padding: 14px; color: #5a655e; font-size: 12px; line-height: 1.7; }
 .replacement-content { padding: 0 24px 24px; font-size: 13px; line-height: 1.8; color: #4d5650; }
-.replacement-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+.replacement-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 @media (max-width: 600px) {
   .workspace-tools > div { display: grid; grid-template-columns: 1fr 1fr; width: 100%; }
   .workspace-tools button { justify-content: center; min-height: 35px; }

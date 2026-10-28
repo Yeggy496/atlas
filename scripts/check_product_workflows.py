@@ -176,6 +176,7 @@ with sync_playwright() as p:
         started = time.monotonic()
         with page.expect_response(lambda r: r.url.endswith('/api/constraints/parse'), timeout=180000) as pending:
             page.get_by_role('button', name='识别约束', exact=True).click()
+            page.get_by_role('dialog', name='如何处理已有任务？').get_by_role('button', name='保留现有任务并识别').click()
         response = pending.value
         assert response.ok, response.text()
         parsed = response.json()

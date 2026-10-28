@@ -77,6 +77,7 @@ const SCENARIO_ICONS: Record<Scenario, typeof CalendarDays> = {
   production: Factory,
 };
 type ReplacementAction = "preset" | "blank" | "clear-all" | "clear-constraints" | "clear-activities";
+type ParseMode = "keep" | "replace";
 
 function mondayOf(date: string): string {
   const day = new Date(`${date}T12:00:00Z`);
@@ -93,6 +94,19 @@ function modelChanges(before: Problem, after: Problem): string {
     return `${key === "activities" ? "活动" : key === "constraints" ? "约束" : "资源"}：新增 ${added} / 修改 ${changed} / 移除 ${removed}`;
   };
   return [count("activities"), count("constraints"), count("resources")].join("；");
+}
+
+function unmentionedNewActivities(before: Problem, after: Problem, input: string): string[] {
+  const normalize = (value: string) => value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+  const existing = new Map(before.activities.map((activity) => [activity.id, normalize(activity.name)]));
+  const source = normalize(input);
+  const names = after.activities.filter((activity) => existing.get(activity.id) !== normalize(activity.name)).filter((activity) => {
+    const base = activity.name.replace(/[（(][^）)]*[）)]/g, "")
+      .replace(/(?:周[一二三四五六日天]|第?[一二三四五六七八九十0-9]+(?:次|节|课时)?)\s*$/, "").trim();
+    const key = normalize(base);
+    return key.length > 0 && !source.includes(key);
+  }).map((activity) => activity.name);
+  return [...new Set(names)];
 }
 
 export default function App() {
@@ -115,7 +129,9 @@ export default function App() {
   const [connectionFailed, setConnectionFailed] = useState(false);
   const [retryAction, setRetryAction] = useState<"parse" | "solve" | null>(null);
   const [pendingText, setPendingText] = useState<{ kind: string; text: string; chars: number; filename: string } | null>(null);
-  const [scenarioHint, setScenarioHint] = useState<{ target: Scenario; input: string } | null>(null);
+  const [scenarioHint, setScenarioHint] = useState<{ target: Scenario; input: string; mode: ParseMode } | null>(null);
+  const [chooseParseMode, setChooseParseMode] = useState(false);
+  const lastParseMode = useRef<ParseMode>("keep");
   const [weightsFailed, setWeightsFailed] = useState(false);
   const explanationCache = useRef(new Map<string, Explanation>());
   const selectedKey = useRef("");
@@ -530,8 +546,14 @@ export default function App() {
       setBusy("");
     }
   }
-  async function parse(allowScenarioMismatch = false) {
+  async function startParse() {
+    if (!problem || busy || !input.trim()) return;
+    if (problem.activities.length || problem.constraints.length) { setChooseParseMode(true); return; }
+    await parse("keep");
+  }
+  async function parse(parseMode: ParseMode = "keep", allowScenarioMismatch = false) {
     if (!problem || busy) return;
+    lastParseMode.current = parseMode;
     const epoch = modelEpoch.current;
     let splitAt = Math.min(input.length, MAX_INPUT_CHARS);
     if (input.length > MAX_INPUT_CHARS) {
@@ -550,21 +572,28 @@ export default function App() {
         summary: string[];
         warnings: string[];
         provider: string;
-      }>("/constraints/parse", { problem, text: segment, ...(allowScenarioMismatch ? { allow_scenario_mismatch: true } : {}) });
+      }>("/constraints/parse", { problem: parseMode === "replace" ? { ...problem, activities: [], constraints: [] } : problem,
+        text: segment, ...(allowScenarioMismatch ? { allow_scenario_mismatch: true } : {}) });
       if (epoch !== modelEpoch.current) return;
+      if (parseMode === "replace" && (problem.activities.length || problem.constraints.length) && !data.problem.activities.length)
+        throw new Error("没有识别出活动，原计划未改变。请补充具体活动后重试；如需清空，请使用“清空当前内容”。");
       const changes = modelChanges(problem, data.problem);
+      const namesToCheck = unmentionedNewActivities(parseMode === "replace" ? { ...problem, activities: [] } : problem, data.problem, segment);
       draft(data.problem);
+      if (parseMode === "replace") { previous.current = []; previousProblem.current = data.problem; }
       setAppliedInput(segment);
       if (remainder.trim()) { setInput(remainder); setAppliedInput(""); }
-      setSummary([changes, ...(remainder.trim() ? [`本段已识别 ${segment.length} 字，剩余 ${remainder.length} 字仍在输入框中，请继续识别。`] : []), ...data.summary]);
-      setWarnings(data.warnings);
+      setSummary([parseMode === "replace" ? "已仅按本次描述建立任务；原计划可通过撤销恢复。" :
+        problem.activities.length || problem.constraints.length ? "已保留并更新现有计划中的任务。" : "已从本次描述识别任务。",
+        changes, ...(remainder.trim() ? [`本段已识别 ${segment.length} 字，剩余 ${remainder.length} 字仍在输入框中，请继续识别。`] : []), ...data.summary]);
+      setWarnings([...data.warnings, ...(namesToCheck.length ? [`以下新增或改名活动的名称未直接出现在原文中，可能是对原文的归纳，请核对：${namesToCheck.slice(0, 8).join("、")}${namesToCheck.length > 8 ? ` 等 ${namesToCheck.length} 项` : ""}。`] : [])]);
       setProvider(data.provider);
-      setInputTab("constraints");
-      setNotice("请检查识别结果，确认后再生成计划。");
+      setInputTab("activities");
+      setNotice("请检查全部活动和约束，确认后再生成计划。");
     } catch (e) {
       if (epoch !== modelEpoch.current) return;
       if (e instanceof ApiError && e.code === "scenario_mismatch" && e.suggestedScenario && Object.hasOwn(SCENARIOS, e.suggestedScenario)) {
-        setScenarioHint({ target: e.suggestedScenario as Scenario, input });
+        setScenarioHint({ target: e.suggestedScenario as Scenario, input, mode: parseMode });
         setRetryAction(null); return;
       }
       setError((e as Error).message);
@@ -987,7 +1016,7 @@ export default function App() {
               <AlertTriangle size={17} />
               <span>{error}</span>
               {connectionFailed && <button onClick={() => void reconnect()}>重试连接</button>}
-              {retryAction && <button disabled={!!busy || retryAction === "solve" && (!reviewed || inputPending)} onClick={() => void (retryAction === "parse" ? parse() : optimize())}>{retryAction === "parse" ? "重试识别" : "重试生成"}</button>}
+              {retryAction && <button disabled={!!busy || retryAction === "solve" && (!reviewed || inputPending)} onClick={() => void (retryAction === "parse" ? parse(lastParseMode.current) : optimize())}>{retryAction === "parse" ? "重试识别" : "重试生成"}</button>}
               {!problem && <button disabled={!!busy} onClick={() => void load(scenario)}>重新载入工作空间</button>}
               <button onClick={() => setError("")} aria-label="关闭错误">
                 <X size={15} />
@@ -1006,7 +1035,7 @@ export default function App() {
             {unsavedScenes.filter((s) => s !== scenario).map((s) => <button key={s} disabled={!!busy} onClick={() => void load(s)}>{SCENARIOS[s].title}</button>)}
           </div>}
           {historyWarning && <div className="message error history-save-warning" role="alert"><AlertTriangle size={17}/><span>{historyWarning}</span></div>}
-          {notice && !constraintEditor && !addingActivity && !editingActivity && !resourcesOpen && !help && !confirmation && !selected && !repeatActivity && !onboarding && !pendingText && !scenarioHint && (
+          {notice && !constraintEditor && !addingActivity && !editingActivity && !resourcesOpen && !help && !confirmation && !selected && !repeatActivity && !onboarding && !pendingText && !scenarioHint && !chooseParseMode && (
             <div className="toast" role="status">
               <CheckCircle2 size={17} />
               {notice}
@@ -1145,7 +1174,7 @@ export default function App() {
                   clearContent={() => setConfirmation("clear-all")}
                   clearConstraints={() => setConfirmation("clear-constraints")}
                   clearActivities={() => setConfirmation("clear-activities")}
-                  parse={() => parse()}
+                  parse={() => startParse()}
                   scenario={scenario}
                   summary={summary}
                   warnings={warnings}
@@ -1205,12 +1234,25 @@ export default function App() {
           )}
         </main>
       </div>
+      {chooseParseMode && problem && <Dialog title="如何处理已有任务？" onClose={() => setChooseParseMode(false)}>
+        <div className="replacement-content">
+          <p>当前计划已有 <strong>{problem.activities.length} 项活动、{problem.constraints.length} 条约束</strong>{problem.activities.length ? `，包括${[...new Set(problem.activities.map((a) => a.name))].slice(0, 3).join("、")}等` : ""}。</p>
+          <p>保留已有任务时，文字中没有提到的任务也会继续参与排程。只使用本次描述时，将从空白活动与约束开始识别，保留资源和所选周。</p>
+          {input.length > MAX_INPUT_CHARS && <p className="form-note">本次识别前 4,000 字，其余文字会保留；继续识别后续文字时，请选择保留已有任务。</p>}
+          <p className="form-note">识别失败不会改变当前计划；成功后可点击“撤销修改”恢复。</p>
+          <div className="replacement-actions">
+            <button className="secondary" onClick={() => setChooseParseMode(false)}>取消</button>
+            <button className="secondary" onClick={() => { setChooseParseMode(false); void parse("keep"); }}>保留现有任务并识别</button>
+            <button className="primary" onClick={() => { setChooseParseMode(false); void parse("replace"); }}>只使用本次描述</button>
+          </div>
+        </div>
+      </Dialog>}
       {scenarioHint && <Dialog title="这段需求更适合个人周计划" onClose={() => setScenarioHint(null)}>
         <div className="replacement-content">
           <p>当前场景是“{SCENARIOS[scenario].title}”，输入包含个人生活与学习安排。可以切换到“{SCENARIOS[scenarioHint.target].title}”，需求文字会一起带过去。</p>
           <p>各场景已有的任务会保留。切换后点击“识别约束”，再检查新识别的任务。</p>
           <div className="replacement-actions">
-            <button className="secondary" disabled={!!busy} onClick={() => { setScenarioHint(null); void parse(true); }}>仍在当前场景识别</button>
+            <button className="secondary" disabled={!!busy} onClick={() => { const hint = scenarioHint; setScenarioHint(null); void parse(hint.mode, true); }}>仍在当前场景识别</button>
             <button className="primary" disabled={!!busy} onClick={() => { const hint = scenarioHint; setScenarioHint(null); void load(hint.target, false, hint.input); }}>切换并带入需求</button>
           </div>
         </div>
