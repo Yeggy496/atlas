@@ -1,0 +1,737 @@
+{
+  "scenario": "life",
+  "name": "我的一周",
+  "activities": [
+    {
+      "id": "sleep0",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        0
+      ],
+      "window_start": 0,
+      "window_end": 16
+    },
+    {
+      "id": "lunch0",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        0
+      ],
+      "window_start": 23,
+      "window_end": 27
+    },
+    {
+      "id": "dinner0",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        0
+      ],
+      "window_start": 35,
+      "window_end": 39
+    },
+    {
+      "id": "sleep1",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        1
+      ],
+      "window_start": 0,
+      "window_end": 16
+    },
+    {
+      "id": "lunch1",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        1
+      ],
+      "window_start": 23,
+      "window_end": 27
+    },
+    {
+      "id": "dinner1",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        1
+      ],
+      "window_start": 35,
+      "window_end": 39
+    },
+    {
+      "id": "sleep2",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        2
+      ],
+      "window_start": 0,
+      "window_end": 16
+    },
+    {
+      "id": "lunch2",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        2
+      ],
+      "window_start": 23,
+      "window_end": 27
+    },
+    {
+      "id": "dinner2",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        2
+      ],
+      "window_start": 35,
+      "window_end": 39
+    },
+    {
+      "id": "sleep3",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        3
+      ],
+      "window_start": 0,
+      "window_end": 16
+    },
+    {
+      "id": "lunch3",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        3
+      ],
+      "window_start": 23,
+      "window_end": 27
+    },
+    {
+      "id": "dinner3",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        3
+      ],
+      "window_start": 35,
+      "window_end": 39
+    },
+    {
+      "id": "sleep4",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        4
+      ],
+      "window_start": 0,
+      "window_end": 16
+    },
+    {
+      "id": "lunch4",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        4
+      ],
+      "window_start": 23,
+      "window_end": 27
+    },
+    {
+      "id": "dinner4",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        4
+      ],
+      "window_start": 35,
+      "window_end": 39
+    },
+    {
+      "id": "sleep5",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        5
+      ],
+      "window_start": 0,
+      "window_end": 16
+    },
+    {
+      "id": "lunch5",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        5
+      ],
+      "window_start": 23,
+      "window_end": 27
+    },
+    {
+      "id": "dinner5",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        5
+      ],
+      "window_start": 35,
+      "window_end": 39
+    },
+    {
+      "id": "sleep6",
+      "name": "睡眠",
+      "duration": 16,
+      "category": "sleep",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        6
+      ],
+      "window_start": 0,
+      "window_end": 16
+    },
+    {
+      "id": "lunch6",
+      "name": "午餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        6
+      ],
+      "window_start": 23,
+      "window_end": 27
+    },
+    {
+      "id": "dinner6",
+      "name": "晚餐",
+      "duration": 1,
+      "category": "meal",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        6
+      ],
+      "window_start": 35,
+      "window_end": 39
+    },
+    {
+      "id": "class0",
+      "name": "高等数学",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        0
+      ]
+    },
+    {
+      "id": "class1",
+      "name": "大学英语",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        1
+      ]
+    },
+    {
+      "id": "class2",
+      "name": "数据结构",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        2
+      ]
+    },
+    {
+      "id": "class3",
+      "name": "机器学习",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        3
+      ]
+    },
+    {
+      "id": "class4",
+      "name": "线性代数",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        4
+      ]
+    },
+    {
+      "id": "meeting0",
+      "name": "项目组会议",
+      "category": "meeting",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        2
+      ]
+    },
+    {
+      "id": "lab0",
+      "name": "实验课",
+      "duration": 4,
+      "category": "course",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        4
+      ]
+    },
+    {
+      "id": "family0",
+      "name": "家庭活动",
+      "duration": 4,
+      "category": "family",
+      "resources": [
+        "me"
+      ],
+      "days": [
+        5
+      ]
+    },
+    {
+      "id": "math0",
+      "name": "高数作业 1",
+      "duration": 3,
+      "category": "math_homework",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "math1",
+      "name": "高数作业 2",
+      "duration": 3,
+      "category": "math_homework",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "python0",
+      "name": "Python 学习 1",
+      "duration": 4,
+      "category": "python_study",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "python1",
+      "name": "Python 学习 2",
+      "duration": 4,
+      "category": "python_study",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "python2",
+      "name": "Python 学习 3",
+      "duration": 4,
+      "category": "python_study",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "english0",
+      "name": "英语复习 1",
+      "category": "english_review",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "english1",
+      "name": "英语复习 2",
+      "category": "english_review",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "english2",
+      "name": "英语复习 3",
+      "category": "english_review",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "data0",
+      "name": "整理实验数据",
+      "category": "lab_report",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "report0",
+      "name": "撰写实验报告",
+      "duration": 4,
+      "category": "lab_report",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "run0",
+      "name": "跑步 1",
+      "category": "exercise",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "run1",
+      "name": "跑步 2",
+      "category": "exercise",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "run2",
+      "name": "跑步 3",
+      "category": "exercise",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "laundry0",
+      "name": "洗衣服",
+      "category": "chore",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "shopping0",
+      "name": "采购生活用品",
+      "category": "chore",
+      "resources": [
+        "me"
+      ]
+    },
+    {
+      "id": "reading0",
+      "name": "自由阅读 1",
+      "category": "leisure",
+      "resources": [
+        "me"
+      ],
+      "optional": true,
+      "priority": 2
+    },
+    {
+      "id": "reading1",
+      "name": "自由阅读 2",
+      "category": "leisure",
+      "resources": [
+        "me"
+      ],
+      "optional": true,
+      "priority": 2
+    },
+    {
+      "id": "game0",
+      "name": "游戏",
+      "category": "leisure",
+      "resources": [
+        "me"
+      ],
+      "optional": true,
+      "priority": 2
+    }
+  ],
+  "resources": [
+    {
+      "id": "me",
+      "name": "我的时间"
+    }
+  ],
+  "constraints": [
+    {
+      "id": "fixed0",
+      "label": "高等数学 · 周一 09:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class0",
+      "day": 0,
+      "start": 18
+    },
+    {
+      "id": "fixed1",
+      "label": "大学英语 · 周二 14:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class1",
+      "day": 1,
+      "start": 28
+    },
+    {
+      "id": "fixed2",
+      "label": "数据结构 · 周三 09:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class2",
+      "day": 2,
+      "start": 18
+    },
+    {
+      "id": "fixed3",
+      "label": "机器学习 · 周四 14:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class3",
+      "day": 3,
+      "start": 28
+    },
+    {
+      "id": "fixed4",
+      "label": "线性代数 · 周五 09:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "class4",
+      "day": 4,
+      "start": 18
+    },
+    {
+      "id": "fixed5",
+      "label": "项目组会议 · 周三 19:00，1 小时",
+      "type": "fixed_time",
+      "target": "meeting0",
+      "day": 2,
+      "start": 38
+    },
+    {
+      "id": "fixed6",
+      "label": "实验课 · 周五 14:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "lab0",
+      "day": 4,
+      "start": 28
+    },
+    {
+      "id": "fixed7",
+      "label": "家庭活动 · 周六 14:00，连续 2 小时",
+      "type": "fixed_time",
+      "target": "family0",
+      "day": 5,
+      "start": 28
+    },
+    {
+      "id": "deadline0",
+      "label": "高数作业 · 周三开始前全部完成",
+      "type": "deadline",
+      "target": "math0",
+      "end": 96
+    },
+    {
+      "id": "deadline1",
+      "label": "高数作业 · 周三开始前全部完成",
+      "type": "deadline",
+      "target": "math1",
+      "end": 96
+    },
+    {
+      "id": "deadline2",
+      "label": "实验报告 · 周五 18:00 前完成",
+      "type": "deadline",
+      "target": "report0",
+      "end": 228
+    },
+    {
+      "id": "prec0",
+      "label": "先整理实验数据，再撰写实验报告",
+      "type": "precedence",
+      "target": "data0",
+      "other": "report0"
+    },
+    {
+      "id": "mathdaily",
+      "label": "高数作业分两天完成，每天最多一次",
+      "type": "daily_limit",
+      "target": "math_homework",
+      "value": 1
+    },
+    {
+      "id": "pythondaily",
+      "label": "Python 学习分三天进行，每天最多一次",
+      "type": "daily_limit",
+      "target": "python_study",
+      "value": 1
+    },
+    {
+      "id": "englishdaily",
+      "label": "英语复习分三天进行，每天最多一次",
+      "type": "daily_limit",
+      "target": "english_review",
+      "value": 1
+    },
+    {
+      "id": "rundaily",
+      "label": "跑步分三天进行，每天最多一次",
+      "type": "daily_limit",
+      "target": "exercise",
+      "value": 1
+    },
+    {
+      "id": "runpref",
+      "label": "跑步尽量安排在 17:00 以后",
+      "type": "preferred_window",
+      "target": "exercise",
+      "level": "soft",
+      "start": 34,
+      "end": 44
+    },
+    {
+      "id": "pythonpref",
+      "label": "Python 学习尽量安排在下午",
+      "type": "preferred_window",
+      "target": "python_study",
+      "level": "soft",
+      "start": 24,
+      "end": 36
+    },
+    {
+      "id": "studywindow_math",
+      "label": "高数作业安排在 08:00–21:30",
+      "type": "time_window",
+      "target": "math_homework",
+      "start": 16,
+      "end": 43
+    },
+    {
+      "id": "studywindow_python",
+      "label": "Python 学习安排在 08:00–21:30",
+      "type": "time_window",
+      "target": "python_study",
+      "start": 16,
+      "end": 43
+    },
+    {
+      "id": "studywindow_english",
+      "label": "英语复习安排在 08:00–21:30",
+      "type": "time_window",
+      "target": "english_review",
+      "start": 16,
+      "end": 43
+    },
+    {
+      "id": "studywindow_lab",
+      "label": "实验报告相关安排在 08:00–21:30",
+      "type": "time_window",
+      "target": "lab_report",
+      "start": 16,
+      "end": 43
+    },
+    {
+      "id": "gamewindow",
+      "label": "游戏安排在周六 20:00–22:00 之间",
+      "type": "time_window",
+      "target": "game0",
+      "start": 40,
+      "end": 44
+    }
+  ]
+}

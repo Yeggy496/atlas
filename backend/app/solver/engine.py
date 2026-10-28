@@ -5,6 +5,7 @@ from ortools.sat.python import cp_model
 from ..schemas import Problem, Assignment
 from .constraints import candidates, applies, preference_cost
 from .validator import verify
+from .search import search
 
 # 三档偏好的目标权重。
 #   goal      软目标（时间窗偏好、可选活动的取舍）
@@ -162,15 +163,13 @@ def solve(problem: Problem, mode='balanced', previous=None, seconds=None, optimi
             model.add_abs_equality(dev, local - target)
             terms['regular'].append(dev)
     # 目标权重：修复流程强制保留原安排，其余情况由档位决定。
-    if optimize:
-        model.minimize(sum(weights[k]*sum(v) for k,v in terms.items()))
-    solver = cp_model.CpSolver()
-    solver.parameters.max_time_in_seconds = seconds
-    solver.parameters.num_search_workers = int(env('OPTIDAY_SOLVER_WORKERS', '4'))
-    solver.parameters.random_seed = 42
-    status = solver.solve(model)
+    objective = sum(weights[k]*sum(v) for k,v in terms.items()) if optimize else None
+    if objective is not None:
+        model.minimize(objective)
+    searched = search(model, seconds, int(env('OPTIDAY_SOLVER_WORKERS', '4')), objective)
+    solver, status = searched.solver, searched.status
     name = solver.status_name(status)
-    base = {'status':name,'assignments':[], 'metrics':{'solve_time':round(solver.wall_time,3),'activities':len(problem.activities),'resources':len(problem.resources),'constraints':len(problem.constraints),'variables':len(model.proto.variables),'model_constraints':len(model.proto.constraints)}, 'objective':None,'conflicts':[],'repairs':[]}
+    base = {'status':name,'assignments':[], 'metrics':{'solve_time':round(searched.wall_time,3),'feasibility_fallback':int(optimize and searched.source == 'feasibility' and status == cp_model.FEASIBLE),'activities':len(problem.activities),'resources':len(problem.resources),'constraints':len(problem.constraints),'variables':len(model.proto.variables),'model_constraints':len(model.proto.constraints)}, 'objective':None,'conflicts':[],'repairs':[]}
     if status not in (cp_model.OPTIMAL,cp_model.FEASIBLE):
         return base
     result = []
@@ -186,7 +185,7 @@ def solve(problem: Problem, mode='balanced', previous=None, seconds=None, optimi
     pref_total, pref_satisfied = preference_summary(problem, result, activity_map)
     base['assignments'] = [x.model_dump() for x in result]
     base['metrics'].update({'hard_violations':0,'scheduled':len(result),'scheduled_hours':sum(x.end-x.start for x in result)/2,'optional_completed':sum(activity_map[x.activity_id].optional for x in result),'preference_total':pref_total,'preference_satisfied':pref_satisfied,'changed':sum(1 for x in result if x.activity_id in old and (x.start!=old[x.activity_id].start or x.room_id!=old[x.activity_id].room_id))+sum(1 for aid in old if aid in activity_map and aid not in {x.activity_id for x in result}),'daily_hours':[sum(x.end-x.start for x in result if x.start//48==day and activity_map[x.activity_id].category!='sleep')/2 for day in range(7)]})
-    base['objective'] = {'penalties':penalties,'weights':weights,'value':round(solver.objective_value,2),'best_bound':round(solver.best_objective_bound,2),'stability_applicable':bool(old)}
+    base['objective'] = {'penalties':penalties,'weights':weights,'value':round(searched.objective,2),'best_bound':round(searched.best_bound,2),'stability_applicable':bool(old)}
     return base
 
 
