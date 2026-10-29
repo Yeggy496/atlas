@@ -798,10 +798,15 @@ export default function App() {
       URL.revokeObjectURL(url);
       return;
     }
-    // XLSX/PDF are rendered by the backend from the exact result on screen.
+    // Keep exported visible names consistent with the calendar, without
+    // changing the workspace, activity IDs, or assignments.
+    const displayNames = occurrenceNames(problem, result.assignments);
+    const displayProblem = { ...problem, activities: problem.activities.map((a) => ({
+      ...a, name: displayNames.get(a.id) ?? a.name,
+    })) };
     setError("");
     setBusy(format === "xlsx" ? "正在导出 Excel…" : "正在导出 PDF…");
-    void exportPlanRequest(format, { problem, result })
+    void exportPlanRequest(format, { problem: displayProblem, result })
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : "导出失败，请重试。"),
       )
