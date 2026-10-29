@@ -46,6 +46,7 @@ import {
 } from "lucide-react";
 import { api, ApiError, exportPlan as exportPlanRequest, upload } from "./api";
 import { Calendar } from "./Calendar";
+import { occurrenceNames } from "./occurrenceNames";
 import { ActivityEditor, ConstraintEditor, Dialog } from "./Editors";
 import { readLocalWorkspaces, writeLocalWorkspaces, readWorkspaceBackup, workspaceKey, LOCAL_WORKSPACE_KEY, type LocalWorkspace } from "./localWorkspace";
 import { readLocalHistory, saveLocalRun, deleteLocalRun, type LocalRun } from "./localHistory";
@@ -809,6 +810,8 @@ export default function App() {
   const metric = result?.metrics;
   const active =
     selected && problem?.activities.find((a) => a.id === selected.activity_id);
+  const activeDisplayName = active && problem && result
+    ? occurrenceNames(problem, result.assignments).get(active.id) ?? active.name : active?.name;
   const totalHours =
     problem?.activities
       .filter((a) => a.category !== "sleep" && !a.optional)
@@ -1372,7 +1375,8 @@ export default function App() {
         />
       )}
       {selected && active && problem && (
-        <Dialog title={active.name} onClose={() => setSelected(null)}>
+        <Dialog title={activeDisplayName ?? active.name} onClose={() => setSelected(null)}>
+          {activeDisplayName !== active.name && <p className="form-note">按日历中的时间顺序显示次数；任务原名为「{active.name}」。</p>}
           <div className="event-detail">
             <span
               className={`category-badge ${(CATEGORIES[active.category] ?? CATEGORIES.study).color}`}

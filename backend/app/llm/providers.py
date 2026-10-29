@@ -8,6 +8,7 @@ from uuid import uuid4
 from typing import Protocol
 import httpx
 from .model_http import model_client
+from .overnight import expand_fixed_daily_sleep
 from .parse_support import completion_content, parse_problem_payload, parse_prompt, parse_token_limit, repair_feedback, IncompleteParse, ProviderStopped
 from pydantic import BaseModel, Field, StrictStr
 from ..schemas import Problem, Activity, Constraint
@@ -82,7 +83,8 @@ class APIProvider:
                     envelope = response.json()
                 try:
                     content = completion_content(envelope)
-                    parsed = validate_parse(json.loads(content), self.provider, expected=problem)
+                    data = expand_fixed_daily_sleep(json.loads(content), problem, text)
+                    parsed = validate_parse(data, self.provider, expected=problem)
                     return {**parsed, 'parse_attempts': attempt + 1}
                 except (ValueError, KeyError, IndexError, TypeError) as invalid:
                     if isinstance(invalid, ProviderStopped):
@@ -168,6 +170,16 @@ def validate_parse(data, provider, expected=None):
     parsed=ParsedConstraints.model_validate(data)
     if expected is not None and (parsed.problem.scenario != expected.scenario or parsed.problem.week_start != expected.week_start):
         raise ValueError('模型不得擅自改变当前场景或所在周。')
+    # A locally impossible window is a malformed extraction, not proof that
+    # the user's scheduling request is infeasible. Ask the model to repair it.
+    for a in parsed.problem.activities:
+        if a.duration > a.window_end - a.window_start:
+            raise ValueError(f'活动「{a.name}」的时长超过当天允许时间窗；跨午夜活动应按自然日拆分。')
+        for c in parsed.problem.constraints:
+            if c.type == 'fixed_time' and c.target == a.id and (
+                c.day not in a.days or c.start < a.window_start or c.start + a.duration > a.window_end
+            ):
+                raise ValueError(f'活动「{a.name}」的固定时间不在活动允许的日期或时间窗内。')
     return {**parsed.model_dump(),'provider':provider,'requires_review':True}
 
 

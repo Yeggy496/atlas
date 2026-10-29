@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Moon, CalendarDays, ArrowUpRight, List, Clock3 } from "lucide-react";
 import { calendarLanes } from "./calendarLayout";
+import { occurrenceNames } from "./occurrenceNames";
 import {
   type Problem,
   type Result,
@@ -35,6 +36,7 @@ export function Calendar({
   } | null>(null);
   const activityMap = new Map(problem.activities.map((a) => [a.id, a]));
   const assignments = (result?.assignments ?? []).filter((x) => activityMap.has(x.activity_id));
+  const displayNames = occurrenceNames(problem, assignments);
   const outsideDaytime = assignments.filter((x) =>
     activityMap.get(x.activity_id)?.category !== "sleep" &&
     (x.start % 48 < 16 || (x.end - 1) % 48 >= 44),
@@ -57,6 +59,7 @@ export function Calendar({
     .filter((a) => fullDay || calendarView === "agenda" || a.category !== "sleep")
     .map((a) => a.category)));
   const sleepDurations = sleep.map((x) => (x.end - x.start) / 2);
+  const splitSleep = sleep.some((x) => x.activity_id.startsWith("daily_overnight_sleep"));
   const sameSleepTime = sleep.every((x) => x.start % 48 === sleep[0].start % 48 && x.end % 48 === sleep[0].end % 48);
   const startDate = new Date(`${problem.week_start}T12:00:00`);
   const getDate = (day: number) => {
@@ -82,7 +85,7 @@ export function Calendar({
         {calendarView !== "agenda" && <button type="button" className={fullDay ? "sleep-toggle selected" : "sleep-toggle"} onClick={changeRange}><Moon size={13} />{fullDay ? "显示白天" : "完整 24 小时"}</button>}
       </div>
       {outsideDaytime.length > 0 && calendarView !== "agenda" && <div className={`calendar-range-note ${fullDay ? "" : "collapsed"}`} role="status"><Clock3 size={14} /><span>{fullDay ? `有 ${outsideDaytime.length} 项早晚活动，已自动展示完整 24 小时。` : `白天视图未完整显示 ${outsideDaytime.length} 项早晚活动。`}</span>{!fullDay && <button type="button" onClick={changeRange}>查看全部</button>}</div>}
-      {sleep.length > 0 && calendarView !== "agenda" && <div className="sleep-banner"><Moon size={14} /><span>睡眠已安排</span><strong>{sleep.length} 段 · {Math.min(...sleepDurations) === Math.max(...sleepDurations) ? `每段 ${sleepDurations[0]} 小时` : `${Math.min(...sleepDurations)}–${Math.max(...sleepDurations)} 小时 / 段`}</strong><span className="muted">{sameSleepTime ? `${clock(sleep[0].start)}–${endClock(sleep[0].end)}` : "时间见全天日历"}</span></div>}
+      {sleep.length > 0 && calendarView !== "agenda" && <div className="sleep-banner"><Moon size={14} /><span>睡眠已安排</span><strong>{splitSleep ? "跨午夜睡眠按日期分段" : `${sleep.length} 段 · ${Math.min(...sleepDurations) === Math.max(...sleepDurations) ? `每段 ${sleepDurations[0]} 小时` : `${Math.min(...sleepDurations)}–${Math.max(...sleepDurations)} 小时 / 段`}`}</strong><span className="muted">{splitSleep ? "周边界按本周截断，可查看完整 24 小时" : sameSleepTime ? `${clock(sleep[0].start)}–${endClock(sleep[0].end)}` : "时间见全天日历"}</span></div>}
       {calendarView === "agenda" ? (
         <div className="calendar-agenda">
           {assignments.length ? DAYS.map((day, dayIndex) => {
@@ -91,7 +94,8 @@ export function Calendar({
               const activity = activityMap.get(x.activity_id)!;
               const category = CATEGORIES[activity.category] ?? CATEGORIES.study;
               const resourceNames = [...new Set([...activity.resources, ...Object.keys(activity.demands), ...(x.room_id ? [x.room_id] : [])])].map((id) => problem.resources.find((r) => r.id === id)?.name).filter(Boolean).join(" · ");
-              return <button type="button" className="agenda-event" key={x.activity_id} aria-label={`${day} ${clock(x.start)} ${activity.name}`} onClick={() => onSelect(x)}><span className="agenda-time"><strong>{clock(x.start)}</strong><small>{endClock(x.end)}</small></span><span className={`agenda-category ${category.color}`}><span className={`dot ${category.color}`} /></span><span className="agenda-event-body"><strong>{activity.name}</strong><small>{category.label} · {(x.end - x.start) / 2} 小时{resourceNames ? ` · ${resourceNames}` : ""}</small></span><ArrowUpRight size={14} /></button>;
+              const displayName = displayNames.get(activity.id) ?? activity.name;
+              return <button type="button" className="agenda-event" key={x.activity_id} aria-label={`${day} ${clock(x.start)} ${displayName}`} onClick={() => onSelect(x)}><span className="agenda-time"><strong>{clock(x.start)}</strong><small>{endClock(x.end)}</small></span><span className={`agenda-category ${category.color}`}><span className={`dot ${category.color}`} /></span><span className="agenda-event-body"><strong>{displayName}</strong><small>{category.label} · {(x.end - x.start) / 2} 小时{resourceNames ? ` · ${resourceNames}` : ""}</small></span><ArrowUpRight size={14} /></button>;
             }) : <p className="agenda-day-empty">这一天暂无已安排活动</p>}</section>;
           }) : <div className="agenda-empty"><CalendarDays size={32} /><h3>还没有生成计划</h3><p>确认左侧约束后，点击“生成计划”。</p></div>}
         </div>
@@ -102,11 +106,12 @@ export function Calendar({
             <div className="time-column">{hours.slice(0, -1).map((h) => <span key={h} style={{ top: (h - startHour) * rowHeight }}>{String(h).padStart(2, "0")}:00</span>)}</div>
             <div className="day-columns">{shownDays.map((dayIndex) => <div className={`day-column ${dayIndex >= 5 ? "weekend" : ""}`} key={DAYS[dayIndex]} style={{ backgroundSize: `100% ${rowHeight}px` }}>{dayEvents[dayIndex].map((x) => {
               const activity = activityMap.get(x.activity_id)!;
+              const displayName = displayNames.get(activity.id) ?? activity.name;
               const category = CATEGORIES[activity.category] ?? CATEGORIES.study;
               const { lane, lanes: count } = lanes[dayIndex].get(x.activity_id)!;
               const visibleStart = Math.max(x.start - dayIndex * 48, startHour * 2);
               const visibleEnd = Math.min(x.end - dayIndex * 48, endHour * 2);
-              return <button type="button" aria-label={`${DAYS[dayIndex]} ${clock(x.start)} ${activity.name}`} title={`${activity.name} ${clock(x.start)}–${endClock(x.end)}`} onClick={() => onSelect(x)} className={`calendar-event ${category.color} ${x.end - x.start <= 1 ? "short" : ""}`} key={x.activity_id} style={{ top: ((visibleStart - startHour * 2) * rowHeight) / 2 + 2, height: Math.max(18, ((visibleEnd - visibleStart) * rowHeight) / 2 - 4), left: `calc(${lane * 100 / count}% + 4px)`, right: `calc(${(count - lane - 1) * 100 / count}% + 4px)` }}><strong>{activity.name}</strong>{x.end - x.start > 1 && <small>{clock(x.start)}–{endClock(x.end)}</small>}{x.end - x.start >= 4 && x.room_id && <small className="event-location">{problem.resources.find((r) => r.id === x.room_id)?.name}</small>}</button>;
+              return <button type="button" aria-label={`${DAYS[dayIndex]} ${clock(x.start)} ${displayName}`} title={`${displayName} ${clock(x.start)}–${endClock(x.end)}`} onClick={() => onSelect(x)} className={`calendar-event ${category.color} ${x.end - x.start <= 1 ? "short" : ""}`} key={x.activity_id} style={{ top: ((visibleStart - startHour * 2) * rowHeight) / 2 + 2, height: Math.max(18, ((visibleEnd - visibleStart) * rowHeight) / 2 - 4), left: `calc(${lane * 100 / count}% + 4px)`, right: `calc(${(count - lane - 1) * 100 / count}% + 4px)` }}><strong>{displayName}</strong>{x.end - x.start > 1 && <small>{clock(x.start)}–{endClock(x.end)}</small>}{x.end - x.start >= 4 && x.room_id && <small className="event-location">{problem.resources.find((r) => r.id === x.room_id)?.name}</small>}</button>;
             })}</div>)}</div>
             {!assignments.length && <div className="calendar-empty"><CalendarDays size={36} /><h3>为这一周腾出更多可能</h3><p>确认左侧约束后，点击“生成计划”。</p></div>}
             {assignments.length > 0 && calendarView === "day" && dayEvents[selectedDay].length === 0 && <div className="calendar-empty"><CalendarDays size={32} /><h3>这一天暂无活动</h3><p>选择其他日期，或切换清单查看完整一周。</p></div>}
