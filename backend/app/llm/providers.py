@@ -10,6 +10,8 @@ import httpx
 from .model_http import model_client
 from .overnight import expand_fixed_daily_sleep
 from .soft_preferences import normalize_soft_preferences
+from .working_windows import normalize_explicit_working_windows
+from .grounding import meeting_participant_warnings, constrained_preference_warnings
 from .parse_support import completion_content, parse_problem_payload, parse_prompt, parse_token_limit, repair_feedback, IncompleteParse, ProviderStopped
 from pydantic import BaseModel, Field, StrictStr, ValidationError
 from ..schemas import Problem, Activity, Constraint
@@ -109,9 +111,13 @@ class APIProvider:
                     envelope = response.json()
                 try:
                     content = completion_content(envelope)
-                    data = normalize_soft_preferences(json.loads(content))
+                    data = normalize_soft_preferences(json.loads(content), problem, text)
                     data = expand_fixed_daily_sleep(data, problem, text)
+                    data = normalize_explicit_working_windows(data, problem, text)
                     parsed = validate_parse(data, self.provider, expected=problem)
+                    parsed_problem = Problem.model_validate(parsed['problem'])
+                    parsed['warnings'].extend(meeting_participant_warnings(parsed_problem, text))
+                    parsed['warnings'].extend(constrained_preference_warnings(parsed_problem))
                     return {**parsed, 'parse_attempts': attempt + 1}
                 except (ValueError, KeyError, IndexError, TypeError) as invalid:
                     if isinstance(invalid, ProviderStopped):

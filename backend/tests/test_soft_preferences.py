@@ -14,7 +14,7 @@ def test_unsupported_soft_deadline_is_not_made_hard_and_user_is_warned():
     out = normalize_soft_preferences(data)
     assert len(data['problem']['constraints']) == 1
     assert out['problem']['constraints'] == []
-    assert '未纳入本次求解' in out['warnings'][0]
+    assert '未纳入本次求解' in out['warnings'][-1]
     assert validate_parse(out, 'deepseek')['requires_review']
 
 
@@ -49,3 +49,15 @@ def test_avoid_period_is_not_treated_as_a_preferred_period():
     out = normalize_soft_preferences(data)
     assert not out['problem']['constraints']
     assert '未纳入本次求解' in out['warnings'][-1]
+
+
+def test_unambiguously_soft_job_deadline_is_not_enforced_as_hard():
+    data = data_with_constraints([{'id': 'p', 'label': '工单A须在周三18:00前完成', 'type': 'deadline',
+                                   'target': 'job_a', 'level': 'hard', 'end': 132}])
+    data['problem']['activities'] = [{'id': 'job_a', 'name': '工单A-质检'}]
+    text = '工单A希望在周三18:00之前完成，工单B最晚周五18:00完成。'
+    out = normalize_soft_preferences(data, text=text)
+    assert not out['problem']['constraints']
+    assert '原文中是希望' in out['warnings'][-1]
+    retained = normalize_soft_preferences(data, text='工单A必须在周三18:00之前完成。')
+    assert retained['problem']['constraints'] == data['problem']['constraints']
