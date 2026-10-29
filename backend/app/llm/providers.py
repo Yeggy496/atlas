@@ -10,7 +10,7 @@ import httpx
 from .model_http import model_client
 from .overnight import expand_fixed_daily_sleep
 from .parse_support import completion_content, parse_problem_payload, parse_prompt, parse_token_limit, repair_feedback, IncompleteParse, ProviderStopped
-from pydantic import BaseModel, Field, StrictStr
+from pydantic import BaseModel, Field, StrictStr, ValidationError
 from ..schemas import Problem, Activity, Constraint
 
 
@@ -37,6 +37,26 @@ def parse_failure_message(error: Exception) -> str:
         return prefix + '模型服务没有完成此次识别，当前输入已保留，请稍后重试。'
     if isinstance(error, IncompleteParse):
         return prefix + '模型返回内容被截断，尚未形成完整任务。当前输入已保留，请重试识别或分段输入。'
+    if isinstance(error, ValidationError):
+        # Only structural paths and error codes are returned: not model output,
+        # original user input, credentials, or validation message values.
+        errors = error.errors(include_input=False, include_context=False, include_url=False)
+        details = []
+        safe_fields = {'problem', 'summary', 'warnings', 'scenario', 'week_start', 'name', 'activities',
+                       'resources', 'constraints', 'id', 'duration', 'category', 'demands', 'room_options',
+                       'required_seats', 'room_type', 'days', 'window_start', 'window_end', 'optional',
+                       'priority', 'group', 'op_index', 'type', 'target', 'level', 'day', 'start',
+                       'end', 'other', 'value', 'source', 'capacity', 'seats'}
+        for item in errors[:3]:
+            location = '.'.join(str(part) if isinstance(part, int) or part in safe_fields else '<key>'
+                                for part in item.get('loc', ())) or 'problem'
+            code = str(item.get('type', 'invalid'))
+            details.append(f'{location} ({code})')
+        return prefix + '模型生成的数据字段未通过校验：' + '；'.join(details) + '。输入已保留，可重试或分段输入。'
+    if isinstance(error, json.JSONDecodeError):
+        return prefix + '模型输出不是完整 JSON，输入已保留，请重试或分段输入。'
+    if isinstance(error, (KeyError, IndexError, TypeError)):
+        return prefix + '模型输出缺少必要的数据结构，输入已保留，请重试或分段输入。'
     if isinstance(error, httpx.HTTPStatusError):
         status = error.response.status_code
         hint = ('请检查密钥权限或网关访问限制。' if status in (401, 403) else
@@ -180,6 +200,18 @@ def validate_parse(data, provider, expected=None):
                 c.day not in a.days or c.start < a.window_start or c.start + a.duration > a.window_end
             ):
                 raise ValueError(f'活动「{a.name}」的固定时间不在活动允许的日期或时间窗内。')
+    activities = {a.id: a for a in parsed.problem.activities}
+    for c in parsed.problem.constraints:
+        if c.type != 'precedence' or c.target not in activities or c.other not in activities:
+            continue
+        before, after = activities[c.target], activities[c.other]
+        if before.name == after.name:
+            continue
+        # Catch an internal contradiction only when the label unambiguously
+        # says that target is AFTER other; do not infer intent from vague names.
+        reversed_label = re.escape(before.name) + r'\s*在\s*' + re.escape(after.name) + r'.{0,6}(?:之后|以后)'
+        if re.search(reversed_label, c.label):
+            raise ValueError(f'前置约束「{c.label}」与target先于other的顺序相反。')
     return {**parsed.model_dump(),'provider':provider,'requires_review':True}
 
 

@@ -10,7 +10,8 @@ import pytest
 from app import main
 from app.adapters import ADAPTERS
 from app.llm.parse_support import completion_content, IncompleteParse, parse_token_limit, suggested_scenario
-from app.llm.providers import APIProvider
+from app.llm.providers import APIProvider, ParsedConstraints, parse_failure_message, validate_parse
+from pydantic import ValidationError
 
 
 def envelope(data, reason='stop'):
@@ -21,6 +22,31 @@ def envelope(data, reason='stop'):
 
 def parsed_problem():
     return {'problem': ADAPTERS['life']().model_dump(), 'summary': ['完整识别'], 'warnings': []}
+
+
+def test_failed_model_validation_reports_only_safe_field_paths():
+    data = parsed_problem()
+    data['problem']['activities'][0]['demands'] = {'PRIVATE_TEST_VALUE': 'wrong'}
+    with pytest.raises(ValidationError) as exc:
+        ParsedConstraints.model_validate(data)
+    message = parse_failure_message(exc.value)
+    assert 'problem.activities.0.demands.<key>' in message
+    assert 'PRIVATE_TEST_VALUE' not in message and 'wrong' not in message
+
+
+def test_reversed_precedence_label_is_not_silently_accepted():
+    data = parsed_problem()
+    problem = data['problem']
+    problem['activities'] = [
+        {'id': 'prep', 'name': '样品制备', 'resources': []},
+        {'id': 'observation', 'name': '显微观察', 'resources': []},
+    ]
+    problem['constraints'] = [{'id': 'order', 'type': 'precedence',
+        'label': '显微观察在样品制备之后', 'target': 'observation', 'other': 'prep'}]
+    with pytest.raises(ValueError, match='顺序相反'):
+        validate_parse(data, 'deepseek')
+    problem['constraints'][0].update(target='prep', other='observation')
+    assert validate_parse(data, 'deepseek')['requires_review'] is True
 
 
 @pytest.mark.parametrize('week_start', ['2026-10-12', '2026-10-26'])
