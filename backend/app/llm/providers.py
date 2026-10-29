@@ -9,6 +9,7 @@ from typing import Protocol
 import httpx
 from .model_http import model_client
 from .overnight import expand_fixed_daily_sleep
+from .soft_preferences import normalize_soft_preferences
 from .parse_support import completion_content, parse_problem_payload, parse_prompt, parse_token_limit, repair_feedback, IncompleteParse, ProviderStopped
 from pydantic import BaseModel, Field, StrictStr, ValidationError
 from ..schemas import Problem, Activity, Constraint
@@ -51,7 +52,12 @@ def parse_failure_message(error: Exception) -> str:
             location = '.'.join(str(part) if isinstance(part, int) or part in safe_fields else '<key>'
                                 for part in item.get('loc', ())) or 'problem'
             code = str(item.get('type', 'invalid'))
-            details.append(f'{location} ({code})')
+            known = ('时间偏好必须是软约束。', '当前仅支持将时间偏好设为软约束。',
+                     '时间窗口必须在一天内且起点早于终点。', '固定时间必须包含日期和当天的开始时刻。',
+                     '前置关系、间隔或连排约束必须指定第二项活动。')
+            msg = str(item.get('msg', ''))
+            cause = next((s for s in known if s in msg), '')
+            details.append(f'{location} ({code})' + (f'：{cause}' if cause else ''))
         return prefix + '模型生成的数据字段未通过校验：' + '；'.join(details) + '。输入已保留，可重试或分段输入。'
     if isinstance(error, json.JSONDecodeError):
         return prefix + '模型输出不是完整 JSON，输入已保留，请重试或分段输入。'
@@ -103,7 +109,8 @@ class APIProvider:
                     envelope = response.json()
                 try:
                     content = completion_content(envelope)
-                    data = expand_fixed_daily_sleep(json.loads(content), problem, text)
+                    data = normalize_soft_preferences(json.loads(content))
+                    data = expand_fixed_daily_sleep(data, problem, text)
                     parsed = validate_parse(data, self.provider, expected=problem)
                     return {**parsed, 'parse_attempts': attempt + 1}
                 except (ValueError, KeyError, IndexError, TypeError) as invalid:
